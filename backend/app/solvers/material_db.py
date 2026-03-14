@@ -3,7 +3,8 @@ Material database for S.T.R.U.C.T.
 Contains properties for common engineering materials.
 Auto-fetches unknown materials from Gemini when not found locally.
 """
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 import json
 import os
 
@@ -28,13 +29,15 @@ def fetch_and_store_material(material_name: str) -> Material:
     Fetches material properties from Gemini when the material is not in the local database.
     Stores the result so the same lookup is not repeated.
     """
-    api_key = os.getenv("GOOGLE_API_KEY", "")
-    if not api_key:
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    if not project_id:
+        print("[S.T.R.U.C.T] No GCP project ID configured, using default Carbon Steel.")
         return MATERIALS["Carbon Steel"]
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+        vertexai.init(project=project_id, location=location)
+        model = GenerativeModel(
+            model_name="gemini-1.5-pro",
             system_instruction=(
                 "You are a materials science expert. Return ONLY a raw JSON object with exact keys: "
                 "{\"youngs_modulus\": float_Pa, \"density\": float_kgm3, \"yield_strength\": float_Pa, "
