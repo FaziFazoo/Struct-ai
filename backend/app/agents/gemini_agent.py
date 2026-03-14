@@ -82,12 +82,8 @@ RULES:
                 return reply, params
             except Exception as e:
                 err_str = str(e)
-                log.warning(f"Gemini call failed: {err_str[:120]}")
-                if "quota" in err_str.lower() or "rate" in err_str.lower() or "429" in err_str:
-                    reply = ("⚠ API quota reached for today. Switching to local analysis engine. "
-                             "Your query is still being processed.")
-                else:
-                    reply = f"Processing your query locally (Gemini unavailable: {err_str[:60]})"
+                log.error(f"Vertex AI call failed: {err_str}", exc_info=True)
+                reply = f"Error communicating with Vertex AI: {err_str[:200]}"
                 # Fall through to local regex extraction
                 params = self._regex_extract(query)
                 return reply, params
