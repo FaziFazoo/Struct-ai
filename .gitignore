@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables (contains API keys)
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+frontend/build/
+frontend/.cache/
+dist/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker volumes
+backend/static/plots/*.png
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python virtualenv
+venv/
+.venv/
+env/

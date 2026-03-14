@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+numpy
+matplotlib
+google-generativeai
+python-multipart
+pillow
+scipy
+pydantic
