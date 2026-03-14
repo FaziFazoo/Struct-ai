@@ -37,7 +37,7 @@ def fetch_and_store_material(material_name: str) -> Material:
     try:
         vertexai.init(project=project_id, location=location)
         model = GenerativeModel(
-            model_name="gemini-1.5-pro",
+            model_name="gemini-2.0-flash-001",
             system_instruction=(
                 "You are a materials science expert. Return ONLY a raw JSON object with exact keys: "
                 "{\"youngs_modulus\": float_Pa, \"density\": float_kgm3, \"yield_strength\": float_Pa, "

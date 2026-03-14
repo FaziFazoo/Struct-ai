@@ -16,7 +16,7 @@ class DynamicSolverAgent:
         if project_id:
             vertexai.init(project=project_id, location=location)
             self.model = GenerativeModel(
-                "gemini-1.5-pro",
+                "gemini-2.0-flash-001",
                 system_instruction=["""
                 You are a structural engineering solver code generator.
                 Generate clean, safe Python functions for structural analysis.

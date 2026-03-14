@@ -27,7 +27,7 @@ class VisionModule:
     def __init__(self, project_id: str, location: str = "us-central1"):
         if project_id:
             vertexai.init(project=project_id, location=location)
-            self.model = GenerativeModel("gemini-1.5-pro")
+            self.model = GenerativeModel("gemini-2.0-flash-001")
             log.info(f"VisionModule initialised via Vertex AI in {project_id}/{location}")
         else:
             self.model = None
