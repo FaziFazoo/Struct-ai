@@ -9,7 +9,8 @@ const ChatInterface = ({
     handleSend,
     speechMode,
     toggleSpeechMode,
-    isListening,
+    speechStatus,
+    liveTranscript,
     startListening,
     stopListening,
     handleFileUpload
@@ -24,7 +25,7 @@ const ChatInterface = ({
 
   const handleMicClick = () => {
     if (!speechMode) return;
-    if (isListening) stopListening();
+    if (speechStatus === 'LISTENING' || speechStatus === 'PROCESSING') stopListening();
     else startListening();
   };
 
@@ -66,8 +67,8 @@ const ChatInterface = ({
           {speechMode ? 'Speech' : 'Text'}
         </button>
         {speechMode && (
-          <span className={`text-[8px] uppercase tracking-widest ${isListening ? 'text-red-400 animate-pulse' : 'text-white/20'}`}>
-            {isListening ? '● live' : '○ idle'}
+          <span className={`text-[8px] uppercase tracking-widest ${speechStatus === 'LISTENING' ? 'text-red-400 animate-pulse' : speechStatus === 'PROCESSING' ? 'text-yellow-400 animate-pulse' : 'text-white/20'}`}>
+            {speechStatus === 'LISTENING' ? '● listening' : speechStatus === 'PROCESSING' ? '● processing' : '○ idle'}
           </span>
         )}
       </div>
@@ -93,9 +94,9 @@ const ChatInterface = ({
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <span className="text-jarvis-blue/40 select-none">{'['}S.T.R.U.C.T{']'}</span>
+                  <div className="mt-1 w-2 h-2 bg-jarvis-blue rounded-full shadow-glow"></div>
                   <div className="flex-1 space-y-1">
-                    <span className="text-jarvis-blue/90">{m.content}</span>
+                    <span className="text-jarvis-blue/90">{m.content.replace(/^\[.*?\]\s*/, '')}</span>
                     {m.type === 'simulation_meta' && (
                       <div className="mt-2 pt-2 text-[10px] text-jarvis-blue/40 border-t border-jarvis-blue/10 w-fit uppercase tracking-widest">
                         [EXEC_ID: {m.simulation_id?.slice(0, 8)}] PORTAL_STATUS: ACTIVE
@@ -108,6 +109,22 @@ const ChatInterface = ({
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Live Transcript Overlay */}
+      <AnimatePresence>
+        {liveTranscript && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="px-6 py-2 pb-0 -mb-2 z-10"
+          >
+            <div className="text-[13px] font-mono italic text-white/50 border-l-2 border-red-500/50 pl-3">
+              {liveTranscript}...
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input Module */}
       <div className="p-5 space-y-4 border-t border-white/5 bg-white/[0.01]">
@@ -138,16 +155,18 @@ const ChatInterface = ({
               onClick={handleMicClick}
               disabled={!speechMode}
               className={`transition-all duration-300 relative ${
-                isListening
+                speechStatus === 'LISTENING'
                   ? 'text-red-500 scale-110'
-                  : speechMode
-                    ? 'text-jarvis-blue hover:scale-110'
-                    : 'text-white/20 cursor-not-allowed'
+                  : speechStatus === 'PROCESSING'
+                    ? 'text-yellow-400 animate-pulse'
+                    : speechMode
+                      ? 'text-jarvis-blue hover:scale-110'
+                      : 'text-white/20 cursor-not-allowed'
               }`}
-              title={speechMode ? (isListening ? 'Stop' : 'Speak') : 'Enable Speech Mode first'}
+              title={speechMode ? (speechStatus !== 'IDLE' ? 'Stop' : 'Speak') : 'Enable Speech Mode first'}
             >
-              {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-              {isListening && (
+              {speechStatus !== 'IDLE' ? <MicOff size={20} /> : <Mic size={20} />}
+              {speechStatus === 'LISTENING' && (
                 <div className="absolute -bottom-7 left-1/2 -translate-x-1/2">
                   <div className="w-12 h-1 bg-red-500 rounded-full animate-pulse"></div>
                 </div>

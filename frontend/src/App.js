@@ -19,7 +19,8 @@ const App = () => {
 
   // Speech mode
   const [speechMode, setSpeechMode] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState('IDLE'); // 'IDLE' | 'LISTENING' | 'PROCESSING'
+  const [liveTranscript, setLiveTranscript] = useState('');
   const recognitionRef = useRef(null);
   const handleSendRef = useRef(null);
 
@@ -43,36 +44,55 @@ const App = () => {
     window.speechSynthesis.speak(utt);
   }, [speechMode]);
 
-  // ── Speech recognition ─────────────────────────────────────────────────
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { alert('Speech recognition not supported. Use Chrome.'); return; }
     const recognition = new SR();
     recognition.lang = 'en-US';
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.onresult = (e) => {
-      console.log('[STRUCT] Input received: voice');
-      if (handleSendRef.current) handleSendRef.current(e.results[0][0].transcript);
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) {
+          final += e.results[i][0].transcript;
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      setLiveTranscript(final || interim);
+      if (final) {
+        setSpeechStatus('PROCESSING');
+        // Small delay to let the user see their final text before clearing
+        setTimeout(() => setLiveTranscript(''), 800);
+        if (handleSendRef.current) handleSendRef.current(final);
+      }
     };
-    recognition.onend = () => setIsListening(false);
+    recognition.onstart = () => {
+      setSpeechStatus('LISTENING');
+      setLiveTranscript('');
+    };
+    recognition.onend = () => {
+      setSpeechStatus(prev => prev === 'LISTENING' ? 'IDLE' : prev);
+    };
     recognition.onerror = (e) => {
       console.log("Speech error:", e.error);
       if (e.error === 'not-allowed') {
         setSpeechMode(false);
         setMessages(prev => [...prev, { role: 'assistant', content: "[SYSTEM_ERROR] Microphone access denied. Reverting to manual input." }]);
       }
-      setIsListening(false);
+      setSpeechStatus('IDLE');
     };
     recognitionRef.current = recognition;
     recognition.start();
-    setIsListening(true);
   }, []);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
-    setIsListening(false);
+    setSpeechStatus('IDLE');
+    setLiveTranscript('');
   }, []);
 
   const toggleSpeechMode = useCallback(() => {
@@ -155,15 +175,25 @@ const App = () => {
             `| Max deflection: ${simData.deflection_mm?.toFixed(2)} mm`
           );
 
-          const simMsg = `[ANALYSIS_COMPLETE] Simulation solved successfully. Maximum stress is ${simData.max_stress_mpa?.toFixed(1)} Megapascals. Factor of safety is ${simData.safety_factor?.toFixed(2)}. Maximum deflection is ${simData.deflection_mm?.toFixed(2)} millimeters.`;
-
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            type: 'simulation_meta',
-            content: simMsg,
-            simulation_id: simData.simulation_id,
-          }]);
-          speakResponse(simMsg);
+          // S.T.R.U.C.T Copilot Workflow Synthesis Workflow
+          try {
+            const prompt = `[SYSTEM_INJECT] Simulation finished with Max Stress ${simData.max_stress_mpa?.toFixed(1)} MPa, Factor of Safety ${simData.safety_factor?.toFixed(2)}, Deflection ${simData.deflection_mm?.toFixed(2)} mm. Synthesize these results conversationally to the user and proactively suggest exactly one follow-up analysis like buckling or thermal stress. Keep it professional and under 3 sentences.`;
+            const syncResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(prompt)}`);
+            const simSynthesis = syncResponse.data.response;
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              type: 'simulation_meta',
+              content: simSynthesis,
+              simulation_id: simData.simulation_id,
+            }]);
+            speakResponse(simSynthesis);
+          } catch (e) {
+            // Unlikely fallback
+            const simMsg = `[ANALYSIS_COMPLETE] Simulation solved successfully. Maximum stress is ${simData.max_stress_mpa?.toFixed(1)} Megapascals. Factor of safety is ${simData.safety_factor?.toFixed(2)}.`;
+            setMessages(prev => [...prev, { role: 'assistant', type: 'simulation_meta', content: simMsg, simulation_id: simData.simulation_id }]);
+            speakResponse(simMsg);
+          }
+          setSpeechStatus('IDLE');
         } catch (simErr) {
           const detail = simErr.response?.data?.detail || simErr.message;
           console.error('[STRUCT] /beam_analysis error:', detail);
@@ -184,6 +214,7 @@ const App = () => {
       }]);
     } finally {
       setIsAnalyzing(false);
+      setSpeechStatus('IDLE');
     }
   };
 
@@ -206,12 +237,29 @@ const App = () => {
           image: base64,
           prompt: "Extract beam length, load, boundary conditions, and dimensions from this engineering diagram"
         });
+        
+        if (response.data.status === 'clarify') {
+          setAnalyzeStatus('IDLE');
+          const clarifyMsg = `[VISION_CLARIFY] ${response.data.message}`;
+          setMessages(prev => [...prev, { role: 'assistant', content: clarifyMsg }]);
+          speakResponse(clarifyMsg);
+          return;
+        }
+
         setAnalysisData(response.data);
         setAnalyzeStatus('COMPLETE');
         const extractedType = response.data.parameters?.beam_type ?? 'unknown';
-        const msg = `[VISION_COMPLETE] Extracted structural profile for ${extractedType} beam. Results computed.`;
-        setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
-        speakResponse(msg);
+        
+        try {
+          const prompt = `[SYSTEM_INJECT] Vision analysis complete. Formally acknowledge the extraction of the ${extractedType} beam and inform the user you are solving the system structure.`;
+          const syncResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(prompt)}`);
+          setMessages(prev => [...prev, { role: 'assistant', content: syncResponse.data.response }]);
+          speakResponse(syncResponse.data.response);
+        } catch(e) {
+          const msg = `[VISION_COMPLETE] Extracted structural profile for ${extractedType} beam. Results computed.`;
+          setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
+          speakResponse(msg);
+        }
       } catch (err) {
         setAnalyzeStatus('ERROR');
         setMessages(prev => [...prev, { role: 'assistant', content: "[VISION_ERROR] Signal degradation. Unable to parse structural diagram." }]);
@@ -240,7 +288,8 @@ const App = () => {
         handleSend={handleSend}
         speechMode={speechMode}
         toggleSpeechMode={toggleSpeechMode}
-        isListening={isListening}
+        speechStatus={speechStatus}
+        liveTranscript={liveTranscript}
         startListening={startListening}
         stopListening={stopListening}
         handleFileUpload={handleFileUpload}

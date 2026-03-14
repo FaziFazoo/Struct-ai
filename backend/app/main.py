@@ -258,20 +258,30 @@ async def parse_parameters(query: str):
 async def analyze_diagram(request: DiagramAnalysisRequest):
     log.info("/diagram_analysis called")
     try:
-        raw_params = await vision.extract_parameters(request.image, request.prompt)
+        vision_res = await vision.extract_parameters(request.image, request.prompt)
+        if not vision_res:
+             raise HTTPException(status_code=400, detail="Vision analysis failed to return data.")
+             
+        # New conversational copilot flow: Check if Gemini needs clarification
+        if vision_res.get("status") == "clarify":
+            log.info(f"Vision clarify requested: {vision_res.get('message')}")
+            return {"status": "clarify", "message": vision_res.get("message")}
+            
+        raw_params = vision_res.get("parameters")
         normalized = normalize_params(raw_params, source="image")
         if normalized:
             valid, result = validate_params(normalized)
             if not valid:
                 log.warning(f"/diagram_analysis validation failed: {result}")
-                raise HTTPException(status_code=400, detail=result)
+                return {"status": "clarify", "message": f"I extracted some parameters, but {result}"}
             engine_params = to_engine_params(result)
             log.info(f"/diagram_analysis running simulation with: {engine_params}")
             res = _run_analysis(**engine_params)
             res["parameters"] = result
+            res["status"] = "success"
             return res
         else:
-            raise HTTPException(status_code=400, detail="Could not extract parameters from image")
+            return {"status": "clarify", "message": "I couldn't identify any clear structural parameters in this diagram. Could you describe the beam textually?"}
     except HTTPException:
         raise
     except Exception as e:
