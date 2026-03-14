@@ -19,7 +19,7 @@ class GeminiAgent:
             vertexai.init(project=project_id, location=location)
             # One model instance for all interactions
             self.model = GenerativeModel(
-                "gemini-2.0-flash-001",
+                "gemini-1.5-flash-001",
                 system_instruction=["""
 You are S.T.R.U.C.T — Structural Testing, Reasoning & Unified Computational Tool.
 You are a structural engineering AI assistant.
