@@ -81,16 +81,12 @@ RULES:
                 log.info(f"Gemini combined call OK — params={'yes' if params else 'no'}")
                 return reply, params
             except Exception as e:
-                err_str = str(e)
-                log.error(f"Vertex AI call failed: {err_str}", exc_info=True)
-                reply = f"Error communicating with Vertex AI: {err_str[:200]}"
-                # Fall through to local regex extraction
-                params = self._regex_extract(query)
-                return reply, params
+                err_str = f"Vertex AI Error: {str(e)}"
+                log.error(err_str, exc_info=True)
+                return err_str, self._regex_extract(query)
         else:
-            reply = "S.T.R.U.C.T local engine active (no API key)."
-            params = self._regex_extract(query)
-            return reply, params
+            msg = "S.T.R.U.C.T local engine (Vertex AI not configured)."
+            return msg, self._regex_extract(query)
 
     # ── Legacy compat: kept so old /chat and /parse_parameters still work ──
     async def process_query(self, query: str):
