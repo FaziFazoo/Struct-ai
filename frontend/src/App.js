@@ -10,7 +10,7 @@ const SESSION_ID = `struct_${Date.now()}_${Math.random().toString(36).substr(2, 
 
 const App = () => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Systems initialized. I'm S.T.R.U.C.T — your Structural Engineering Copilot. Provide beam parameters to begin analysis." }
+    { role: 'assistant', content: "[SYSTEM_INIT] S.T.R.U.C.T Core initialized and standing by for parameter input." }
   ]);
   const [input, setInput] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
@@ -31,7 +31,12 @@ const App = () => {
   const speakResponse = useCallback((text) => {
     if (!speechMode) return;
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
+    
+    // Strip out console prefixes (e.g. [SYSTEM_INIT]) before speaking
+    const cleanText = text.replace(/\[.*?\]/g, '').trim();
+    if (!cleanText) return;
+
+    const utt = new SpeechSynthesisUtterance(cleanText);
     utt.rate = 1;
     utt.pitch = 1;
     utt.volume = 1;
@@ -55,7 +60,7 @@ const App = () => {
       console.log("Speech error:", e.error);
       if (e.error === 'not-allowed') {
         setSpeechMode(false);
-        setMessages(prev => [...prev, { role: 'assistant', content: "Microphone access denied. Switching to text input." }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: "[SYSTEM_ERROR] Microphone access denied. Reverting to manual input." }]);
       }
       setIsListening(false);
     };
@@ -72,7 +77,16 @@ const App = () => {
 
   const toggleSpeechMode = useCallback(() => {
     setSpeechMode(prev => {
-      if (prev) { stopListening(); window.speechSynthesis.cancel(); }
+      if (prev) { 
+        stopListening(); 
+        window.speechSynthesis.cancel(); 
+      } else {
+        // Prime synthesis engine on toggle (which requires a user click) 
+        // to bypass modern browser interaction policies for audio playback.
+        const initUtt = new SpeechSynthesisUtterance('');
+        initUtt.volume = 0;
+        window.speechSynthesis.speak(initUtt);
+      }
       return !prev;
     });
   }, [stopListening]);
@@ -102,8 +116,9 @@ const App = () => {
       console.log('[STRUCT] Normalized parameters:', normalizedParams ? 'RECEIVED' : 'none (conversational)');
       if (missingFields) console.log('[STRUCT] Validation failed:', missingFields);
 
-      setMessages(prev => [...prev, { role: 'assistant', content: jarvisReply }]);
-      speakResponse(jarvisReply);
+      const formattedReply = `[OUTPUT] ${jarvisReply}`;
+      setMessages(prev => [...prev, { role: 'assistant', content: formattedReply }]);
+      speakResponse(formattedReply);
 
       // ── If normalized parameters came back, run simulation ──────────────
       if (normalizedParams) {
@@ -140,7 +155,7 @@ const App = () => {
             `| Max deflection: ${simData.deflection_mm?.toFixed(2)} mm`
           );
 
-          const simMsg = `Structural analysis complete. Results are now displayed on the dashboard.`;
+          const simMsg = `[ANALYSIS_COMPLETE] Simulation solved successfully. Maximum stress is ${simData.max_stress_mpa?.toFixed(1)} Megapascals. Factor of safety is ${simData.safety_factor?.toFixed(2)}. Maximum deflection is ${simData.deflection_mm?.toFixed(2)} millimeters.`;
 
           setMessages(prev => [...prev, {
             role: 'assistant',
@@ -153,7 +168,7 @@ const App = () => {
           const detail = simErr.response?.data?.detail || simErr.message;
           console.error('[STRUCT] /beam_analysis error:', detail);
           setAnalyzeStatus('ERROR');
-          setMessages(prev => [...prev, { role: 'assistant', content: `Simulation failed: ${detail}` }]);
+          setMessages(prev => [...prev, { role: 'assistant', content: `[EXECUTION_FAILED] ${detail}` }]);
         }
       } else {
         setAnalyzeStatus('IDLE'); // Pure conversation — stay idle
@@ -165,7 +180,7 @@ const App = () => {
       setAnalyzeStatus('ERROR');
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Connection error: ${detail}. Is the backend running?`
+        content: `[CONNECTION_ERROR] ${detail}. Verify that core backend is online.`
       }]);
     } finally {
       setIsAnalyzing(false);
@@ -179,7 +194,7 @@ const App = () => {
     console.log('[STRUCT] Input received: image');
     setIsAnalyzing(true);
     setAnalyzeStatus('RUNNING');
-    setMessages(prev => [...prev, { role: 'assistant', content: "Processing structural diagram. Please wait." }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: "[PROCESS_STARTED] Computing structural parameters from blueprint diagram." }]);
 
     const reader = new FileReader();
 
@@ -194,12 +209,12 @@ const App = () => {
         setAnalysisData(response.data);
         setAnalyzeStatus('COMPLETE');
         const extractedType = response.data.parameters?.beam_type ?? 'unknown';
-        const msg = `Vision analysis complete. Extracted ${extractedType} beam. Results loaded.`;
+        const msg = `[VISION_COMPLETE] Extracted structural profile for ${extractedType} beam. Results computed.`;
         setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
         speakResponse(msg);
       } catch (err) {
         setAnalyzeStatus('ERROR');
-        setMessages(prev => [...prev, { role: 'assistant', content: "Unable to interpret diagram. Please provide beam parameters." }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: "[VISION_ERROR] Signal degradation. Unable to parse structural diagram." }]);
       } finally {
         setIsAnalyzing(false);
       }

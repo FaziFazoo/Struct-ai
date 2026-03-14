@@ -81,26 +81,29 @@ const ChatInterface = ({
           {messages.map((m, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 10, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.3 }}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              className={`flex flex-col mb-4 font-mono text-[12px] tracking-wide ${m.role === 'user' ? 'text-white/60' : 'text-jarvis-blue'}`}
             >
-              <div className={`
-                max-w-[90%] p-4 rounded-lg
-                ${m.role === 'user'
-                  ? 'bg-jarvis-blue/10 border border-jarvis-blue/30 text-jarvis-blue font-light'
-                  : 'bg-white/[0.03] border border-white/10 text-white/80 font-extralight tracking-wide'}
-                shadow-lg backdrop-blur-sm
-              `}>
-                <p className="text-[13px] leading-relaxed">{m.content}</p>
-                {m.type === 'simulation_meta' && (
-                  <div className="mt-2 pt-2 border-t border-white/5 flex gap-4 text-[9px] font-bold uppercase tracking-widest text-white/30">
-                    <span>Solver: S.T.R.U.C.T_Engine</span>
-                    {m.simulation_id && <span>ID: {m.simulation_id.slice(0, 8)}</span>}
+              {m.role === 'user' ? (
+                <div className="flex gap-3">
+                  <span className="text-white/30 select-none">{'>'} COMMAND:</span>
+                  <span className="text-white/80 uppercase">{m.content}</span>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <span className="text-jarvis-blue/40 select-none">{'['}S.T.R.U.C.T{']'}</span>
+                  <div className="flex-1 space-y-1">
+                    <span className="text-jarvis-blue/90">{m.content}</span>
+                    {m.type === 'simulation_meta' && (
+                      <div className="mt-2 pt-2 text-[10px] text-jarvis-blue/40 border-t border-jarvis-blue/10 w-fit uppercase tracking-widest">
+                        [EXEC_ID: {m.simulation_id?.slice(0, 8)}] PORTAL_STATUS: ACTIVE
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
