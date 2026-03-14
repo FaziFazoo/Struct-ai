@@ -3,7 +3,7 @@ import axios from 'axios';
 import ChatInterface from './components/ChatInterface';
 import AnalysisDashboard from './components/AnalysisDashboard';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
 
 // Stable session ID for this browser tab
 const SESSION_ID = `struct_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
