@@ -10,10 +10,8 @@ RUN npm run build
 FROM nginx:alpine
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Cloud Run requires listening on PORT env var
-# Create a template that substitutes PORT at runtime
-RUN echo 'server { listen ${PORT:-8080}; location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/ /index.html; } }' > /etc/nginx/conf.d/default.conf.template
+# Create a template for nginx to automatically substitute the PORT variable
+RUN mkdir -p /etc/nginx/templates && echo 'server { listen ${PORT}; server_name localhost; location / { root /usr/share/nginx/html; index index.html; try_files $uri $uri/ /index.html; } }' > /etc/nginx/templates/default.conf.template
 
 EXPOSE 8080
-
-CMD sh -c "envsubst '\$PORT' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+CMD ["nginx", "-g", "daemon off;"]
