@@ -2,7 +2,7 @@ fastapi
 uvicorn
 numpy
 matplotlib
-google-generativeai
+google-cloud-aiplatform
 python-multipart
 pillow
 scipy

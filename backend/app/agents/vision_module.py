@@ -2,7 +2,8 @@
 Vision module for S.T.R.U.C.T.
 Uses Gemini Vision to extract beam parameters from structural diagrams.
 """
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part
 import json
 import PIL.Image
 import base64
@@ -23,15 +24,14 @@ VISION_PROMPT = (
 
 
 class VisionModule:
-    def __init__(self, api_key):
-        self.api_key = api_key
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
-            log.info("VisionModule initialised with gemini-2.5-flash")
+    def __init__(self, project_id: str, location: str = "us-central1"):
+        if project_id:
+            vertexai.init(project=project_id, location=location)
+            self.model = GenerativeModel("gemini-1.5-pro")
+            log.info(f"VisionModule initialised via Vertex AI in {project_id}/{location}")
         else:
             self.model = None
-            log.warning("VisionModule: no API key — vision calls will fail")
+            log.warning("VisionModule: no GCP project_id — vision calls will fail")
 
     async def extract_parameters(self, base64_image, prompt=None):
         """
@@ -51,10 +51,10 @@ class VisionModule:
                 base64_image = base64_image.split("base64,")[1]
 
             img_bytes = base64.b64decode(base64_image)
-            img = PIL.Image.open(io.BytesIO(img_bytes))
-            log.info(f"[Vision] Image decoded: {img.size[0]}x{img.size[1]}")
+            image_part = Part.from_data(data=img_bytes, mime_type="image/jpeg")
+            log.info(f"[Vision] Image decoded and packaged into Vertex Part")
 
-            response = self.model.generate_content([effective_prompt, img])
+            response = self.model.generate_content([image_part, effective_prompt])
 
             text = response.text.strip()
             log.info(f"[Vision] Gemini raw response: {text[:200]}")

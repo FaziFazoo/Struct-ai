@@ -4,7 +4,8 @@ Handles conversation AND structural parameter extraction in a SINGLE API call
 to stay within free-tier rate limits.
 Falls back to regex extraction when API quota is exceeded.
 """
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 import json
 import re
 import logging
@@ -13,14 +14,13 @@ log = logging.getLogger("struct")
 
 
 class GeminiAgent:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        if api_key:
-            genai.configure(api_key=api_key)
+    def __init__(self, project_id: str, location: str = "us-central1"):
+        if project_id:
+            vertexai.init(project=project_id, location=location)
             # One model instance for all interactions
-            self.model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash',
-                system_instruction="""
+            self.model = GenerativeModel(
+                "gemini-1.5-pro", # Upgrading to the pro model as per Vertex migration norms
+                system_instruction=["""
 You are S.T.R.U.C.T — Structural Testing, Reasoning & Unified Computational Tool.
 You are a structural engineering AI assistant.
 
@@ -51,14 +51,14 @@ RULES:
 4. If a parameter is missing, use these defaults: length=2.0, load_magnitude=500, load_position=same as length, support_type="cantilever", material="Carbon Steel", beam_width=0.1, beam_height=0.1.
 5. "reply" must be plain text only — no code, no backticks, no markdown.
 6. Set "parameters" to null if the message is purely conversational.
-"""
+"""]
             )
-            self.chat = self.model.start_chat(history=[])
-            log.info("GeminiAgent initialised with gemini-2.5-flash")
+            self.chat = self.model.start_chat()
+            log.info(f"GeminiAgent initialised via Vertex AI in {project_id}/{location}")
         else:
             self.model = None
             self.chat = None
-            log.warning("GeminiAgent: no API key — will use regex fallback only")
+            log.warning("GeminiAgent: no GCP project_id — will use regex fallback only")
 
     # ── Single combined Gemini call ────────────────────────────────────────
     async def process_combined(self, query: str):

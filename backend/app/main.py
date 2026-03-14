@@ -38,12 +38,19 @@ app.add_middleware(
 
 # Initialize engines
 viz_engine = VisualizationEngine(output_dir="static/plots")
-api_key = os.getenv("GOOGLE_API_KEY", "")
-log.info(f"API key loaded: {'YES (len={})'.format(len(api_key)) if api_key else 'NO — Gemini calls will fail'}")
 
-jarvis = GeminiAgent(api_key=api_key)
-vision = VisionModule(api_key=api_key)
-dynamic_solver_agent = DynamicSolverAgent(api_key=api_key)
+# Vertex AI Configuration
+project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+if project_id:
+    log.info(f"GCP Project ID loaded: {project_id} (Location: {location})")
+else:
+    log.warning("No GOOGLE_CLOUD_PROJECT set — Vertex AI calls will fail unless ADC provides a default project.")
+
+jarvis = GeminiAgent(project_id=project_id, location=location)
+vision = VisionModule(project_id=project_id, location=location)
+dynamic_solver_agent = DynamicSolverAgent(api_key=os.getenv("GOOGLE_API_KEY", "")) # Keep dynamic solver api_key compat for now unless specified
 
 # Session-based simulation history (in-memory)
 simulation_sessions: Dict[str, List[Dict[str, Any]]] = {}
@@ -55,7 +62,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "S.T.R.U.C.T API",
-        "gemini_configured": bool(api_key),
+        "vertex_configured": bool(project_id),
     }
 
 
