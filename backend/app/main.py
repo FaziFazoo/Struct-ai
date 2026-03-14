@@ -50,7 +50,7 @@ else:
 
 jarvis = GeminiAgent(project_id=project_id, location=location)
 vision = VisionModule(project_id=project_id, location=location)
-dynamic_solver_agent = DynamicSolverAgent(api_key=os.getenv("GOOGLE_API_KEY", "")) # Keep dynamic solver api_key compat for now unless specified
+dynamic_solver_agent = DynamicSolverAgent(project_id=project_id, location=location)
 
 # Session-based simulation history (in-memory)
 simulation_sessions: Dict[str, List[Dict[str, Any]]] = {}

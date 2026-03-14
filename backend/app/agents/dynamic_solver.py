@@ -3,27 +3,30 @@ Dynamic Solver Agent for S.T.R.U.C.T.
 Dynamically generates prototype solvers for unknown analysis types using Gemini.
 Validates generated code before enabling.
 """
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 import os
 import subprocess
 import tempfile
 import json
 
 class DynamicSolverAgent:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
-                system_instruction="""
+    def __init__(self, project_id: str, location: str = "us-central1"):
+        self.project_id = project_id
+        if project_id:
+            vertexai.init(project=project_id, location=location)
+            self.model = GenerativeModel(
+                "gemini-1.5-pro",
+                system_instruction=["""
                 You are a structural engineering solver code generator.
                 Generate clean, safe Python functions for structural analysis.
                 Return ONLY executable Python code with a function called `run_solver(parameters: dict) -> dict`.
                 The function must return a dict with at minimum: {"result": any, "status": "ok" | "error"}.
                 Do not import anything outside the Python standard library.
-                """
+                """]
             )
+        else:
+            self.model = None
 
     async def _generate_solver_code(self, analysis_type: str, parameters: dict) -> str:
         prompt = (
@@ -75,8 +78,8 @@ except Exception as e:
         """
         Entry point: generates a solver, validates it, and runs it if valid.
         """
-        if not self.api_key:
-            return {"status": "error", "message": "API key not configured"}
+        if not self.model:
+            return {"status": "error", "message": "GCP Project ID not configured; Vertex AI dynamic solver unavailable"}
         try:
             print(f"[S.T.R.U.C.T] Generating dynamic solver for: {analysis_type}")
             code = await self._generate_solver_code(analysis_type, parameters)
