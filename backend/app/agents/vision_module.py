@@ -15,10 +15,10 @@ VISION_PROMPT = (
     "You are S.T.R.U.C.T, an expert structural engineering AI copilot. "
     "Analyze this engineering diagram (like a Free Body Diagram) and extract beam parameters. "
     "Return ONLY a raw JSON object (no markdown, no backticks). "
-    "If the diagram is clear enough to run a simulation, return:\n"
+    "If the diagram is completely clear and has lengths/forces, return:\n"
     '{"status": "success", "message": "Extracted parameters.", "parameters": {"beam_type": "cantilever"|"simply_supported", "length": float_in_m, "load": float_in_N, "width": float_in_m, "height": float_in_m, "material": "material_name"}}\n'
     "If critical dimensions or loads are missing/illegible, DO NOT guess wildly. Instead, return a clarification request:\n"
-    '{"status": "clarify", "message": "friendly conversational string asking the user for the specific missing parameter (like length or force).", "parameters": null}'
+    '{"status": "clarify", "message": "I detected the supports and loads, but could not determine the exact beam length or load magnitude. Could you clarify the missing dimensions?", "parameters": null}'
 )
 
 

@@ -30,7 +30,7 @@ const ChatInterface = ({
   };
 
   return (
-    <div className="w-[420px] flex flex-col border-r border-white/10 glass-panel m-2 overflow-hidden shadow-2xl relative">
+    <div className="w-full md:w-[420px] h-[50vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-white/10 glass-panel md:m-2 overflow-hidden shadow-2xl relative flex-shrink-0">
       {/* HUD Header — S.T.R.U.C.T Branding */}
       <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
         <div className="flex items-center gap-3">
@@ -133,9 +133,9 @@ const ChatInterface = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !speechMode && handleSend()}
-            placeholder={speechMode ? "Speech mode active — press mic to speak..." : "Command S.T.R.U.C.T..."}
+            placeholder={speechMode ? "Tap microphone to speak..." : "Command S.T.R.U.C.T..."}
             disabled={speechMode}
-            className="flex-1 bg-transparent py-3 text-[13px] font-light tracking-wide text-white focus:outline-none placeholder:text-white/20 disabled:opacity-50"
+            className="flex-1 bg-transparent py-3 text-[13px] md:text-[13px] font-light tracking-wide text-white focus:outline-none placeholder:text-white/20 disabled:opacity-50 min-w-0"
           />
           {!speechMode && (
             <button
@@ -154,21 +154,21 @@ const ChatInterface = ({
             <button
               onClick={handleMicClick}
               disabled={!speechMode}
-              className={`transition-all duration-300 relative ${
+              className={`transition-all duration-300 relative p-2 md:p-0 flex items-center justify-center ${
                 speechStatus === 'LISTENING'
-                  ? 'text-red-500 scale-110'
+                  ? 'text-red-500 scale-125 md:scale-110'
                   : speechStatus === 'PROCESSING'
-                    ? 'text-yellow-400 animate-pulse'
+                    ? 'text-yellow-400 animate-pulse scale-125 md:scale-100'
                     : speechMode
-                      ? 'text-jarvis-blue hover:scale-110'
+                      ? 'text-jarvis-blue hover:scale-110 scale-125 md:scale-100'
                       : 'text-white/20 cursor-not-allowed'
               }`}
               title={speechMode ? (speechStatus !== 'IDLE' ? 'Stop' : 'Speak') : 'Enable Speech Mode first'}
             >
-              {speechStatus !== 'IDLE' ? <MicOff size={20} /> : <Mic size={20} />}
+              {speechStatus !== 'IDLE' ? <MicOff className="w-6 h-6 md:w-5 md:h-5" /> : <Mic className="w-6 h-6 md:w-5 md:h-5" />}
               {speechStatus === 'LISTENING' && (
-                <div className="absolute -bottom-7 left-1/2 -translate-x-1/2">
-                  <div className="w-12 h-1 bg-red-500 rounded-full animate-pulse"></div>
+                <div className="absolute -bottom-5 md:-bottom-7 left-1/2 -translate-x-1/2">
+                  <div className="w-10 md:w-12 h-1 bg-red-500 rounded-full animate-pulse"></div>
                 </div>
               )}
             </button>

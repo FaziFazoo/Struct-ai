@@ -177,7 +177,8 @@ const App = () => {
 
           // S.T.R.U.C.T Copilot Workflow Synthesis Workflow
           try {
-            const prompt = `[SYSTEM_INJECT] Simulation finished with Max Stress ${simData.max_stress_mpa?.toFixed(1)} MPa, Factor of Safety ${simData.safety_factor?.toFixed(2)}, Deflection ${simData.deflection_mm?.toFixed(2)} mm. Synthesize these results conversationally to the user and proactively suggest exactly one follow-up analysis like buckling or thermal stress. Keep it professional and under 3 sentences.`;
+            const prompt = `[SYSTEM_INJECT] Simulation finished: Max Stress ${simData.max_stress_mpa?.toFixed(1)} MPa, FoS ${simData.safety_factor?.toFixed(2)}, Deflection ${simData.deflection_mm?.toFixed(2)} mm. 
+Explain this result to the engineer as a proactive copilot. E.g., mention where max stress usually occurs in this type of bean, state clearly if it's safe (FoS > 1), and proactively ask if they want to run a specific follow-up (like buckling or thermal stress). Keep it under 4 concise sentences.`;
             const syncResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(prompt)}`);
             const simSynthesis = syncResponse.data.response;
             setMessages(prev => [...prev, {
@@ -272,7 +273,7 @@ const App = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#050507] text-white p-2 gap-2 overflow-hidden selection:bg-jarvis-blue/30 selection:text-white">
+    <div className="flex flex-col md:flex-row h-screen bg-[#050507] text-white p-2 gap-2 overflow-y-auto md:overflow-hidden selection:bg-jarvis-blue/30 selection:text-white">
       {/* Background decor */}
       <div className="fixed inset-0 pointer-events-none opacity-20">
         <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-jarvis-blue/20 to-transparent"></div>

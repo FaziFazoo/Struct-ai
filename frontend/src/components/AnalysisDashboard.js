@@ -41,11 +41,11 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
   const density       = analysisData?.material?.density;
 
   return (
-    <div className="flex-1 flex flex-col p-2 space-y-2">
+    <div className="flex-1 flex flex-col p-2 space-y-2 min-h-0">
       {/* Top Stats Bar */}
-      <div className="h-24 flex gap-2">
+      <div className="flex flex-wrap md:flex-nowrap gap-2">
         {stats.map((stat, i) => (
-          <div key={i} className="flex-1 glass-panel flex flex-col justify-center p-4 border-white/5 relative overflow-hidden group">
+          <div key={i} className="flex-1 min-w-[140px] md:min-w-0 glass-panel flex flex-col justify-center p-4 border-white/5 relative overflow-hidden group">
             <div className={`absolute top-0 left-0 w-1 h-full bg-current ${stat.color} opacity-50`}></div>
             <div className="text-[10px] text-white/40 uppercase font-bold tracking-[0.2em] mb-1">{stat.label}</div>
             <div className={`text-2xl font-extralight tracking-wider glow-text ${stat.color}`}>{stat.value}</div>
@@ -57,7 +57,7 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
       </div>
 
       {/* Main Plot Area */}
-      <div className="flex-1 glass-panel p-6 relative flex flex-col min-h-0">
+      <div className="flex-1 min-h-[300px] md:min-h-0 glass-panel p-4 md:p-6 relative flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full shadow-glow ${isAnalyzing ? 'bg-yellow-400 animate-pulse' : analysisData ? 'bg-green-400' : 'bg-jarvis-blue animate-pulse'}`}></div>
@@ -128,9 +128,9 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
       </div>
 
       {/* Bottom Detail Panels */}
-      <div className="h-1/3 flex gap-2">
+      <div className="flex flex-col md:flex-row h-auto md:h-1/3 gap-2 flex-shrink-0">
         {/* Telemetry Warnings */}
-        <div className="flex-[3] glass-panel p-5 overflow-y-auto border-white/5 custom-scrollbar">
+        <div className="flex-[3] min-h-[150px] glass-panel p-5 overflow-y-auto border-white/5 custom-scrollbar">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Telemetry Warnings</div>
             <div className="text-[10px] text-jarvis-blue font-bold">STRUCT_LOG_v5</div>
@@ -152,7 +152,7 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
         </div>
 
         {/* Material Profile */}
-        <div className="flex-2 glass-panel p-5 border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
+        <div className="flex-[2] min-h-[200px] glass-panel p-5 border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
           <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] mb-4">Material Profile</div>
           {analysisData && materialName ? (
             <div className="space-y-3">
