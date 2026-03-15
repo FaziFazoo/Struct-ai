@@ -4,6 +4,7 @@ import ChatInterface from './components/ChatInterface';
 import AnalysisDashboard from './components/AnalysisDashboard';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+console.log('[S.T.R.U.C.T] API_BASE_URL:', API_BASE_URL);
 
 // Stable session ID for this browser tab
 const SESSION_ID = `struct_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
