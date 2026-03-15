@@ -4,6 +4,29 @@ set -e
 PROJECT_ID="project-2dc5bd49-c8ce-4889-95a"
 REGION="us-central1"
 
+# Attempt to find gcloud if it's not in the PATH (especially for Windows bash)
+if ! command -v gcloud &> /dev/null; then
+    echo "🔍 gcloud not found in PATH, searching in common Windows locations..."
+    GCLOUD_PATHS=(
+        "$HOME/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud"
+        "/c/Users/$USER/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud"
+        "/c/Program Files (x86)/Google/Cloud SDK/google-cloud-sdk/bin/gcloud"
+        "/c/Program Files/Google/Cloud SDK/google-cloud-sdk/bin/gcloud"
+    )
+    for path in "${GCLOUD_PATHS[@]}"; do
+        if [ -f "$path" ]; then
+            alias gcloud="$path"
+            echo "✅ Found gcloud at: $path"
+            break
+        fi
+    done
+fi
+
+# Fallback for systems where alias doesn't work in scripts
+if ! command -v gcloud &> /dev/null && [ -n "$path" ]; then
+    gcloud() { "$path" "$@"; }
+fi
+
 echo "🚀 Deploying to Google Cloud Project: $PROJECT_ID"
 
 # ── 1. Deploy Backend ──────────────────────────────────────────────────────────
