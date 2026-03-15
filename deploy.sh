@@ -19,10 +19,8 @@ gcloud run deploy struct-ai-backend \
 
 # 2. Deploy Frontend
 echo "🎨 Building and deploying Frontend..."
-cd ../frontend
 # Note: Using the Dockerfile.frontend from the deployment folder
-cd ..
-gcloud builds submit --tag gcr.io/$PROJECT_ID/struct-ai-frontend --file deployment/Dockerfile.frontend .
+gcloud builds submit --tag gcr.io/$PROJECT_ID/struct-ai-frontend --dockerfile deployment/Dockerfile.frontend .
 gcloud run deploy struct-ai-frontend \
   --image gcr.io/$PROJECT_ID/struct-ai-frontend \
   --platform managed \
