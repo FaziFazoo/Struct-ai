@@ -3,8 +3,9 @@ import axios from 'axios';
 import VoiceAssistant from './components/ChatInterface';
 import AnalysisDashboard from './components/AnalysisDashboard';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = 'https://struct-ai-backend-jwpcarpvka-uc.a.run.app';
 console.log('[S.T.R.U.C.T] API_BASE_URL:', API_BASE_URL);
+console.log('[S.T.R.U.C.T] Window Origin:', window.location.origin);
 
 // Stable session ID for this browser tab
 const SESSION_ID = `struct_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

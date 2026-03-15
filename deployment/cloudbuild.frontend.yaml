@@ -1,14 +1,12 @@
 steps:
-  # Step 1: Build the React frontend with the backend URL as a build arg
+  # Step 1: Build the image from pre-built local assets
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
       - 'gcr.io/$PROJECT_ID/struct-ai-frontend'
-      - '--build-arg'
-      - 'REACT_APP_API_BASE_URL=$_REACT_APP_API_BASE_URL'
       - '-f'
-      - 'deployment/Dockerfile.frontend'
+      - 'deployment/Dockerfile.static'
       - '.'
 
   # Step 2: Push the image
@@ -19,6 +17,3 @@ steps:
 
 images:
   - 'gcr.io/$PROJECT_ID/struct-ai-frontend'
-
-substitutions:
-  _REACT_APP_API_BASE_URL: 'http://localhost:8000'
