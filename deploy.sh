@@ -19,8 +19,10 @@ gcloud run deploy struct-ai-backend \
 
 # 2. Deploy Frontend
 echo "🎨 Building and deploying Frontend..."
-# Note: Using the Dockerfile.frontend from the deployment folder
-gcloud builds submit --tag gcr.io/$PROJECT_ID/struct-ai-frontend --dockerfile deployment/Dockerfile.frontend .
+BACKEND_URL="https://struct-ai-backend-962155187689.us-central1.run.app"
+gcloud builds submit --tag gcr.io/$PROJECT_ID/struct-ai-frontend \
+  --dockerfile deployment/Dockerfile.frontend \
+  --build-arg REACT_APP_API_BASE_URL=$BACKEND_URL .
 gcloud run deploy struct-ai-frontend \
   --image gcr.io/$PROJECT_ID/struct-ai-frontend \
   --platform managed \
