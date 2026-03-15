@@ -3,8 +3,6 @@ Dynamic Solver Agent for S.T.R.U.C.T.
 Dynamically generates prototype solvers for unknown analysis types using Gemini.
 Validates generated code before enabling.
 """
-import vertexai
-from vertexai.generative_models import GenerativeModel
 import os
 import subprocess
 import tempfile
@@ -13,10 +11,30 @@ import logging
 
 log = logging.getLogger("struct")
 
+try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel
+    VERTEXAI_AVAILABLE = True
+except ImportError:
+    log.error("[DynamicSolver] google-cloud-aiplatform not installed.")
+    VERTEXAI_AVAILABLE = False
+
+
 class DynamicSolverAgent:
     def __init__(self, project_id: str, location: str = "us-central1"):
         self.project_id = project_id
-        if project_id:
+        self.model = None
+
+        if not VERTEXAI_AVAILABLE:
+            log.warning("DynamicSolverAgent: Vertex AI library unavailable")
+            return
+
+        if not project_id:
+            log.warning("DynamicSolverAgent: no GCP project_id — dynamic solver unavailable")
+            return
+
+        try:
+            log.info(f"DynamicSolverAgent: Initialising Vertex AI in project={project_id}, location={location}")
             vertexai.init(project=project_id, location=location)
             self.model = GenerativeModel(
                 "gemini-1.5-flash",
@@ -28,7 +46,9 @@ class DynamicSolverAgent:
                 Do not import anything outside the Python standard library.
                 """]
             )
-        else:
+            log.info("DynamicSolverAgent: Vertex AI initialised OK")
+        except Exception as e:
+            log.error(f"DynamicSolverAgent: Failed to initialise Vertex AI: {type(e).__name__}: {e}", exc_info=True)
             self.model = None
 
     async def _generate_solver_code(self, analysis_type: str, parameters: dict) -> str:
@@ -81,16 +101,12 @@ except Exception as e:
             except Exception as e:
                 log.warning(f"Could not delete temp file {tmp_path}: {e}")
 
-        return {"status": "error", "message": "Unknown error during validation"}
-
     async def solve(self, analysis_type: str, parameters: dict) -> dict:
-        """
-        Entry point: generates a solver, validates it, and runs it if valid.
-        """
+        """Entry point: generates a solver, validates it, and runs it if valid."""
         if not self.model:
             return {"status": "error", "message": "GCP Project ID not configured; Vertex AI dynamic solver unavailable"}
         try:
-            print(f"[S.T.R.U.C.T] Generating dynamic solver for: {analysis_type}")
+            log.info(f"[DynamicSolver] Generating dynamic solver for: {analysis_type}")
             code = await self._generate_solver_code(analysis_type, parameters)
             validation = self._validate_solver(code, parameters)
             if validation.get("status") == "ok":
@@ -109,4 +125,5 @@ except Exception as e:
                     "message": f"Solver validation failed: {validation.get('message')}",
                 }
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            log.error(f"[DynamicSolver] Error: {type(e).__name__}: {e}", exc_info=True)
+            return {"status": "error", "message": f"{type(e).__name__}: {str(e)}"}

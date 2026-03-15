@@ -39,18 +39,38 @@ app.add_middleware(
 # Initialize engines
 viz_engine = VisualizationEngine(output_dir="static/plots")
 
-# Vertex AI Configuration
+# ── Vertex AI Configuration ───────────────────────────────────────────────────
 project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
-if project_id:
-    log.info(f"Vertex AI initialised with Project ID: {project_id}, Location: {location}")
+log.info("=" * 60)
+log.info("S.T.R.U.C.T Backend Starting Up")
+log.info(f"  GOOGLE_CLOUD_PROJECT : {project_id or '(NOT SET — check env vars)'}")
+log.info(f"  GOOGLE_CLOUD_LOCATION: {location}")
+if not project_id:
+    log.warning("⚠️  GOOGLE_CLOUD_PROJECT is not set. Vertex AI will FAIL.")
+    log.warning("   Set it via --set-env-vars in Cloud Run or docker-compose.")
 else:
-    log.warning("GOOGLE_CLOUD_PROJECT not set. Vertex AI will attempt to use default credentials (ADC).")
+    log.info("✅ Vertex AI project ID is set. AI agents will initialise.")
+log.info("=" * 60)
 
-jarvis = GeminiAgent(project_id=project_id, location=location)
-vision = VisionModule(project_id=project_id, location=location)
-dynamic_solver_agent = DynamicSolverAgent(project_id=project_id, location=location)
+try:
+    jarvis = GeminiAgent(project_id=project_id, location=location)
+except Exception as e:
+    log.error(f"GeminiAgent init failed: {e}", exc_info=True)
+    jarvis = GeminiAgent(project_id="", location=location)
+
+try:
+    vision = VisionModule(project_id=project_id, location=location)
+except Exception as e:
+    log.error(f"VisionModule init failed: {e}", exc_info=True)
+    vision = VisionModule(project_id="", location=location)
+
+try:
+    dynamic_solver_agent = DynamicSolverAgent(project_id=project_id, location=location)
+except Exception as e:
+    log.error(f"DynamicSolverAgent init failed: {e}", exc_info=True)
+    dynamic_solver_agent = DynamicSolverAgent(project_id="", location=location)
 
 # Session-based simulation history (in-memory)
 simulation_sessions: Dict[str, List[Dict[str, Any]]] = {}

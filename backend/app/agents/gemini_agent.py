@@ -1,23 +1,39 @@
 """
 Gemini Agent for S.T.R.U.C.T.
-Handles conversation AND structural parameter extraction in a SINGLE API call
-to stay within free-tier rate limits.
-Falls back to regex extraction when API quota is exceeded.
+Handles conversation AND structural parameter extraction in a SINGLE API call.
+Falls back to regex extraction if Vertex AI is unavailable.
 """
-import vertexai
-from vertexai.generative_models import GenerativeModel
 import json
 import re
 import logging
 
 log = logging.getLogger("struct")
 
+try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel
+    VERTEXAI_AVAILABLE = True
+except ImportError:
+    log.error("[GeminiAgent] google-cloud-aiplatform not installed. AI calls will fail.")
+    VERTEXAI_AVAILABLE = False
+
 
 class GeminiAgent:
     def __init__(self, project_id: str, location: str = "us-central1"):
-        if project_id:
+        self.model = None
+        self.chat = None
+
+        if not VERTEXAI_AVAILABLE:
+            log.warning("GeminiAgent: Vertex AI library unavailable — regex fallback only")
+            return
+
+        if not project_id:
+            log.warning("GeminiAgent: no GCP project_id — will use regex fallback only")
+            return
+
+        try:
+            log.info(f"GeminiAgent: Initialising Vertex AI in project={project_id}, location={location}")
             vertexai.init(project=project_id, location=location)
-            # One model instance for all interactions
             self.model = GenerativeModel(
                 "gemini-1.5-flash",
                 system_instruction=["""
@@ -54,17 +70,17 @@ RULES:
 """]
             )
             self.chat = self.model.start_chat()
-            log.info(f"GeminiAgent initialised via Vertex AI in {project_id}/{location}")
-        else:
+            log.info(f"GeminiAgent: Vertex AI initialised OK — project={project_id}, location={location}")
+        except Exception as e:
+            log.error(f"GeminiAgent: Failed to initialise Vertex AI: {e}", exc_info=True)
             self.model = None
             self.chat = None
-            log.warning("GeminiAgent: no GCP project_id — will use regex fallback only")
 
     # ── Single combined Gemini call ────────────────────────────────────────
     async def process_combined(self, query: str):
         """
         Makes ONE Gemini call and returns (reply_text, parameters_or_None).
-        Falls back to regex extraction on quota errors.
+        Falls back to regex extraction on quota errors or if AI is unavailable.
         """
         if self.chat:
             try:
@@ -81,11 +97,12 @@ RULES:
                 log.info(f"Gemini combined call OK — params={'yes' if params else 'no'}")
                 return reply, params
             except Exception as e:
-                err_str = f"Vertex AI Error: {str(e)}"
-                log.error(err_str, exc_info=True)
-                return err_str, self._regex_extract(query)
+                log.error(f"Vertex AI call failed: {type(e).__name__}: {e}", exc_info=True)
+                # Return error message as reply and fall back to regex
+                fallback_reply = f"[AI_FALLBACK] Vertex AI error: {type(e).__name__}. Using local parameter extraction."
+                return fallback_reply, self._regex_extract(query)
         else:
-            msg = "S.T.R.U.C.T local engine (Vertex AI not configured)."
+            msg = "S.T.R.U.C.T local engine active (Vertex AI not configured). Using regex parameter extraction."
             return msg, self._regex_extract(query)
 
     # ── Legacy compat: kept so old /chat and /parse_parameters still work ──
@@ -106,7 +123,6 @@ RULES:
         """
         text_lower = text.lower()
 
-        # Only attempt extraction if this looks like a structural query
         structural_keywords = [
             "beam", "cantilever", "simply supported", "load", "force",
             "stress", "deflection", "analyze", "analyse", "analysis",
@@ -119,12 +135,10 @@ RULES:
 
         log.info("Regex fallback: extracting structural parameters")
 
-        # Support type
         support_type = "cantilever"
         if "simply supported" in text_lower or "simply-supported" in text_lower or "pinned" in text_lower:
             support_type = "simply_supported"
 
-        # Length (m or mm)
         length = 2.0
         m = re.search(r'(\d+(?:\.\d+)?)\s*m(?:etre|eter|m)?\b(?!\s*m)', text_lower)
         if m:
@@ -134,7 +148,6 @@ RULES:
             if m:
                 length = float(m.group(1)) / 1000.0
 
-        # Load (N or kN)
         load = 500.0
         m = re.search(r'(\d+(?:\.\d+)?)\s*kn\b', text_lower)
         if m:
@@ -144,10 +157,8 @@ RULES:
             if m:
                 load = float(m.group(1))
 
-        # Load position: default to end for cantilever, mid for simply supported
         load_pos = length if support_type == "cantilever" else length / 2.0
 
-        # Beam width
         bw = 0.1
         m = re.search(r'width\s*[=:]?\s*(\d+(?:\.\d+)?)\s*(mm|m)?', text_lower)
         if m:
@@ -155,7 +166,6 @@ RULES:
             unit = m.group(2) or "m"
             bw = val / 1000.0 if unit == "mm" or val > 1.0 else val
 
-        # Beam height / depth
         bh = 0.1
         m = re.search(r'(?:height|depth|h)\s*[=:]?\s*(\d+(?:\.\d+)?)\s*(mm|m)?', text_lower)
         if m:
@@ -163,7 +173,6 @@ RULES:
             unit = m.group(2) or "m"
             bh = val / 1000.0 if unit == "mm" or val > 1.0 else val
 
-        # Material
         material = "Carbon Steel"
         for mat_key, mat_name in [
             ("steel", "Carbon Steel"), ("alumin", "Aluminum 6061"),

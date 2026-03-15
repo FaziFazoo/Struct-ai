@@ -2,15 +2,25 @@
 Vision module for S.T.R.U.C.T.
 Uses Gemini Vision to extract beam parameters from structural diagrams.
 """
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part
 import json
-import PIL.Image
 import base64
-import io
 import logging
 
 log = logging.getLogger("struct")
+
+try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel, Part
+    VERTEXAI_AVAILABLE = True
+except ImportError:
+    log.error("[VisionModule] google-cloud-aiplatform not installed. Vision calls will fail.")
+    VERTEXAI_AVAILABLE = False
+
+try:
+    import PIL.Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 VISION_PROMPT = (
     "You are S.T.R.U.C.T, an expert structural engineering AI copilot. "
@@ -25,13 +35,24 @@ VISION_PROMPT = (
 
 class VisionModule:
     def __init__(self, project_id: str, location: str = "us-central1"):
-        if project_id:
+        self.model = None
+
+        if not VERTEXAI_AVAILABLE:
+            log.warning("VisionModule: Vertex AI library unavailable — vision calls will fail")
+            return
+
+        if not project_id:
+            log.warning("VisionModule: no GCP project_id — vision calls will fail")
+            return
+
+        try:
+            log.info(f"VisionModule: Initialising Vertex AI in project={project_id}, location={location}")
             vertexai.init(project=project_id, location=location)
             self.model = GenerativeModel("gemini-1.5-flash")
-            log.info(f"VisionModule initialised via Vertex AI in {project_id}/{location}")
-        else:
+            log.info(f"VisionModule: Vertex AI initialised OK — project={project_id}, location={location}")
+        except Exception as e:
+            log.error(f"VisionModule: Failed to initialise Vertex AI: {e}", exc_info=True)
             self.model = None
-            log.warning("VisionModule: no GCP project_id — vision calls will fail")
 
     async def extract_parameters(self, base64_image, prompt=None):
         """
@@ -42,7 +63,6 @@ class VisionModule:
             log.error("[Vision] No model available — cannot process image")
             return None
 
-        # Use structured prompt for reliable JSON output
         effective_prompt = prompt if prompt else VISION_PROMPT
         log.info(f"[Vision] Processing image (base64 length={len(base64_image)})")
 
@@ -52,14 +72,12 @@ class VisionModule:
 
             img_bytes = base64.b64decode(base64_image)
             image_part = Part.from_data(data=img_bytes, mime_type="image/jpeg")
-            log.info(f"[Vision] Image decoded and packaged into Vertex Part")
+            log.info("[Vision] Image decoded and packaged into Vertex Part")
 
             response = self.model.generate_content([image_part, effective_prompt])
-
             text = response.text.strip()
             log.info(f"[Vision] Gemini raw response: {text[:200]}")
 
-            # Strip markdown fences if present
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
@@ -73,5 +91,5 @@ class VisionModule:
             log.error(f"[Vision] JSON parse error: {e}")
             return None
         except Exception as e:
-            log.error(f"[Vision] Error processing image: {e}", exc_info=True)
+            log.error(f"[Vision] Error processing image: {type(e).__name__}: {e}", exc_info=True)
             return None

@@ -1,9 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 numpy
 matplotlib
-google-cloud-aiplatform
-python-multipart
-pillow
 scipy
+pillow
 pydantic
+python-multipart
+google-cloud-aiplatform>=1.38.0
