@@ -3,7 +3,6 @@ set -e
 
 PROJECT_ID="project-2dc5bd49-c8ce-4889-95a"
 REGION="us-central1"
-BACKEND_URL="https://struct-ai-backend-962155187689.us-central1.run.app"
 
 echo "🚀 Deploying to Google Cloud Project: $PROJECT_ID"
 
@@ -18,6 +17,13 @@ gcloud run deploy struct-ai-backend \
   --allow-unauthenticated \
   --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=$REGION
 cd ..
+
+# Dynamically fetch the newly deployed backend URL
+BACKEND_URL=$(gcloud run services describe struct-ai-backend --region $REGION --format="value(status.url)")
+if [ -z "$BACKEND_URL" ]; then
+  echo "❌ Failed to retrieve Backend URL! Using fallback."
+  BACKEND_URL="https://struct-ai-backend-jwpcarpvka-uc.a.run.app"
+fi
 
 echo "✅ Backend deployed: $BACKEND_URL"
 
@@ -38,4 +44,4 @@ gcloud run deploy struct-ai-frontend \
 
 echo "✅ Deployment Complete!"
 echo "   Backend  → $BACKEND_URL"
-echo "   Frontend → https://struct-ai-frontend-962155187689.us-central1.run.app"
+echo "   Frontend → $(gcloud run services describe struct-ai-frontend --region $REGION --format='value(status.url)')"
