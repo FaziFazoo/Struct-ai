@@ -233,7 +233,7 @@ Explain this result to the engineer as a proactive copilot. E.g., mention where 
       setAnalyzeStatus('ERROR');
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `[CONNECTION_ERROR] ${detail}. Verify that core backend is online.`
+        content: `[CONNECTION_ERROR] Failed to reach ${API_BASE_URL}. ${detail}. Verify that your backend service is running and CORS is allowed.`
       }]);
     } finally {
       setIsAnalyzing(false);
@@ -285,7 +285,7 @@ Explain this result to the engineer as a proactive copilot. E.g., mention where 
         }
       } catch (err) {
         setAnalyzeStatus('ERROR');
-        setMessages(prev => [...prev, { role: 'assistant', content: "[VISION_ERROR] Signal degradation. Unable to parse structural diagram." }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: `[VISION_ERROR] Failed to reach ${API_BASE_URL} for diagram analysis.` }]);
       } finally {
         setIsAnalyzing(false);
       }
