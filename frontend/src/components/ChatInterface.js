@@ -13,6 +13,7 @@ const ChatInterface = ({
     liveTranscript,
     startListening,
     stopListening,
+    handleMicInteraction,
     handleFileUpload
 }) => {
   const scrollRef = useRef(null);
@@ -23,11 +24,7 @@ const ChatInterface = ({
     }
   }, [messages]);
 
-  const handleMicClick = () => {
-    if (!speechMode) return;
-    if (speechStatus === 'LISTENING' || speechStatus === 'PROCESSING') stopListening();
-    else startListening();
-  };
+  // Removed local handleMicClick, using handleMicInteraction from props
 
   return (
     <div className="w-full md:w-[420px] h-[50vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-white/10 glass-panel md:m-2 overflow-hidden shadow-2xl relative flex-shrink-0">
@@ -128,51 +125,45 @@ const ChatInterface = ({
 
       {/* Input Module */}
       <div className="p-5 space-y-4 border-t border-white/5 bg-white/[0.01]">
-        <div className="flex gap-3 items-center bg-white/5 rounded-xl px-4 py-1 border border-white/5 focus-within:border-jarvis-blue/40 transition-all duration-500">
+        <div className="flex gap-2 items-center bg-white/5 rounded-xl px-4 py-1 border border-white/5 focus-within:border-jarvis-blue/40 transition-all duration-500">
+          <button
+            onClick={handleMicInteraction}
+            className={`transition-all duration-300 relative flex items-center justify-center p-2 rounded-lg ${
+              speechStatus === 'LISTENING'
+                ? 'text-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]'
+                : speechStatus === 'PROCESSING'
+                  ? 'text-yellow-400 animate-pulse'
+                  : 'text-jarvis-blue hover:bg-jarvis-blue/10'
+            }`}
+            title={speechStatus === 'LISTENING' ? 'Stop Listening' : 'Voice Command'}
+          >
+            {speechStatus === 'LISTENING' ? <MicOff size={20} className="animate-pulse" /> : <Mic size={20} />}
+          </button>
+
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !speechMode && handleSend()}
-            placeholder={speechMode ? "Tap microphone to speak..." : "Command S.T.R.U.C.T..."}
-            disabled={speechMode}
+            placeholder={speechStatus === 'LISTENING' ? "Listening..." : "Command S.T.R.U.C.T..."}
+            disabled={speechStatus === 'LISTENING'}
             className="flex-1 bg-transparent py-3 text-[13px] md:text-[13px] font-light tracking-wide text-white focus:outline-none placeholder:text-white/20 disabled:opacity-50 min-w-0"
           />
-          {!speechMode && (
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim()}
-              className="group p-2 text-white/20 hover:text-jarvis-blue transition-all disabled:opacity-0"
-            >
-              <Send size={18} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          )}
+          
+          <div className="flex items-center gap-1">
+            {!speechMode && (
+              <button
+                onClick={() => handleSend()}
+                disabled={!input.trim()}
+                className="group p-2 text-white/20 hover:text-jarvis-blue transition-all disabled:opacity-0"
+              >
+                <Send size={18} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-between items-center px-2">
           <div className="flex gap-5 items-center">
-            {/* Mic button — active only in speech mode */}
-            <button
-              onClick={handleMicClick}
-              disabled={!speechMode}
-              className={`transition-all duration-300 relative p-2 md:p-0 flex items-center justify-center ${
-                speechStatus === 'LISTENING'
-                  ? 'text-red-500 scale-125 md:scale-110'
-                  : speechStatus === 'PROCESSING'
-                    ? 'text-yellow-400 animate-pulse scale-125 md:scale-100'
-                    : speechMode
-                      ? 'text-jarvis-blue hover:scale-110 scale-125 md:scale-100'
-                      : 'text-white/20 cursor-not-allowed'
-              }`}
-              title={speechMode ? (speechStatus !== 'IDLE' ? 'Stop' : 'Speak') : 'Enable Speech Mode first'}
-            >
-              {speechStatus !== 'IDLE' ? <MicOff className="w-6 h-6 md:w-5 md:h-5" /> : <Mic className="w-6 h-6 md:w-5 md:h-5" />}
-              {speechStatus === 'LISTENING' && (
-                <div className="absolute -bottom-5 md:-bottom-7 left-1/2 -translate-x-1/2">
-                  <div className="w-10 md:w-12 h-1 bg-red-500 rounded-full animate-pulse"></div>
-                </div>
-              )}
-            </button>
-
             {/* File upload */}
             <label className="text-white/30 hover:text-jarvis-blue cursor-pointer transition-all">
               <Upload size={18} />

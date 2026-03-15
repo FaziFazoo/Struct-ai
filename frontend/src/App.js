@@ -111,6 +111,27 @@ const App = () => {
     });
   }, [stopListening]);
 
+  const handleMicInteraction = useCallback(() => {
+    if (!speechMode) {
+      // First, enable speech mode
+      setSpeechMode(true);
+      // Prime TTS
+      const initUtt = new SpeechSynthesisUtterance('');
+      initUtt.volume = 0;
+      window.speechSynthesis.speak(initUtt);
+      // Then start listening (may need a tiny delay for state to propagate if not using functional update or refs)
+      // Actually setSpeechMode triggers a re-render. startListening is stable.
+      // We can call startListening directly.
+      setTimeout(startListening, 100);
+    } else {
+      if (speechStatus === 'LISTENING' || speechStatus === 'PROCESSING') {
+        stopListening();
+      } else {
+        startListening();
+      }
+    }
+  }, [speechMode, speechStatus, startListening, stopListening]);
+
   // ── Main send handler ──────────────────────────────────────────────────
   const handleSend = async (text = input) => {
     if (!text.trim()) return;
@@ -293,6 +314,7 @@ Explain this result to the engineer as a proactive copilot. E.g., mention where 
         liveTranscript={liveTranscript}
         startListening={startListening}
         stopListening={stopListening}
+        handleMicInteraction={handleMicInteraction}
         handleFileUpload={handleFileUpload}
       />
 

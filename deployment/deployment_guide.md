@@ -6,7 +6,7 @@ This guide describes how to deploy the AI FEA Copilot system to Google Cloud.
 - Google Cloud Project with Billing enabled.
 - gcloud CLI installed.
 - Vertex AI and Cloud Run APIs enabled.
-- Google Generative AI API Key.
+- Application Default Credentials (ADC) or Service Account with Vertex AI User role.
 
 ## Backend Deployment (Google Cloud Run)
 
@@ -15,15 +15,12 @@ This guide describes how to deploy the AI FEA Copilot system to Google Cloud.
    gcloud builds submit --tag gcr.io/[PROJECT_ID]/ai-fea-backend
    ```
 
-2. **Deploy to Cloud Run**:
-   ```bash
-   gcloud run deploy ai-fea-backend \
-     --image gcr.io/[PROJECT_ID]/ai-fea-backend \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --set-env-vars GOOGLE_API_KEY=[YOUR_API_KEY]
-   ```
+    gcloud run deploy ai-fea-backend \
+      --image gcr.io/[PROJECT_ID]/ai-fea-backend \
+      --platform managed \
+      --region us-central1 \
+      --allow-unauthenticated \
+      --set-env-vars GOOGLE_CLOUD_PROJECT=[PROJECT_ID],GOOGLE_CLOUD_LOCATION=us-central1
 
 ## Frontend Deployment (Firebase Hosting or Cloud Run)
 

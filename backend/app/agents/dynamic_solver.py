@@ -9,6 +9,9 @@ import os
 import subprocess
 import tempfile
 import json
+import logging
+
+log = logging.getLogger("struct")
 
 class DynamicSolverAgent:
     def __init__(self, project_id: str, location: str = "us-central1"):
@@ -16,7 +19,7 @@ class DynamicSolverAgent:
         if project_id:
             vertexai.init(project=project_id, location=location)
             self.model = GenerativeModel(
-                "gemini-1.5-flash-001",
+                "gemini-1.5-flash",
                 system_instruction=["""
                 You are a structural engineering solver code generator.
                 Generate clean, safe Python functions for structural analysis.
@@ -70,9 +73,15 @@ except Exception as e:
         except subprocess.TimeoutExpired:
             return {"status": "error", "message": "Solver validation timed out (10s limit)"}
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": f"Validation process error: {str(e)}"}
         finally:
-            os.unlink(tmp_path)
+            try:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            except Exception as e:
+                log.warning(f"Could not delete temp file {tmp_path}: {e}")
+
+        return {"status": "error", "message": "Unknown error during validation"}
 
     async def solve(self, analysis_type: str, parameters: dict) -> dict:
         """

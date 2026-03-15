@@ -44,9 +44,9 @@ project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
 if project_id:
-    log.info(f"GCP Project ID loaded: {project_id} (Location: {location})")
+    log.info(f"Vertex AI initialised with Project ID: {project_id}, Location: {location}")
 else:
-    log.warning("No GOOGLE_CLOUD_PROJECT set — Vertex AI calls will fail unless ADC provides a default project.")
+    log.warning("GOOGLE_CLOUD_PROJECT not set. Vertex AI will attempt to use default credentials (ADC).")
 
 jarvis = GeminiAgent(project_id=project_id, location=location)
 vision = VisionModule(project_id=project_id, location=location)
@@ -154,7 +154,7 @@ def _run_analysis(length: float, load_magnitude: float, load_position: float,
         rec = {k: v for k, v in response.items() if k != "plot_image"}
         simulation_sessions[session_id].append(rec)
 
-    log.info(f"Simulation COMPLETE — id={sim_id[:8]}")
+    log.info(f"Simulation COMPLETE — id={str(sim_id)[:8]}")
     return response
 
 
@@ -168,7 +168,7 @@ async def analyze_beam(request: BeamAnalysisRequest):
     load_position = request.load_position
 
     # Unit conversion (only if units are explicitly provided by caller)
-    if request.units:
+    if request.units is not None:
         length = to_si(length, request.units.get("length", "m"))
         load_magnitude = to_si(load_magnitude, request.units.get("force", "N"))
         load_position = to_si(load_position, request.units.get("length", "m"))
@@ -220,7 +220,7 @@ async def chat_with_struct(query: str):
     The frontend can use the parameters field to trigger simulation directly.
     All parameters pass through the normalization + validation layer.
     """
-    log.info(f"/chat: {query[:80]}")
+    log.info(f"/chat: {str(query)[:80]}")
     try:
         reply, raw_params = await jarvis.process_combined(query)
         normalized = normalize_params(raw_params, source="text")
@@ -239,7 +239,7 @@ async def chat_with_struct(query: str):
 @app.get("/parse_parameters")
 async def parse_parameters(query: str):
     """Parameter extraction endpoint — uses normalizer for consistency."""
-    log.info(f"/parse_parameters: {query[:80]}")
+    log.info(f"/parse_parameters: {str(query)[:80]}")
     try:
         _, raw_params = await jarvis.process_combined(query)
         normalized = normalize_params(raw_params, source="text")
