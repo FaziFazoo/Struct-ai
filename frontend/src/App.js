@@ -4,6 +4,8 @@ import VoiceAssistant from './components/ChatInterface';
 import AnalysisDashboard from './components/AnalysisDashboard';
 
 const API_BASE_URL = 'https://struct-ai-backend-jwpcarpvka-uc.a.run.app';
+const VERSION = 'V1.0.1_FINAL_FIX';
+console.log(`[S.T.R.U.C.T] VERSION: ${VERSION}`);
 console.log('[S.T.R.U.C.T] API_BASE_URL:', API_BASE_URL);
 console.log('[S.T.R.U.C.T] Window Origin:', window.location.origin);
 
