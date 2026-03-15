@@ -1,0 +1,1 @@
+import vertexai; vertexai.init(project='project-2dc5bd49-c8ce-4889-95a', location='us-central1'); from vertexai.generative_models import GenerativeModel; m = GenerativeModel('gemini-1.5-flash'); print(m.generate_content('Say hello').text)

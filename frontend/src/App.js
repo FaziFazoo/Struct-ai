@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
-import ChatInterface from './components/ChatInterface';
+import VoiceAssistant from './components/ChatInterface';
 import AnalysisDashboard from './components/AnalysisDashboard';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
 console.log('[S.T.R.U.C.T] API_BASE_URL:', API_BASE_URL);
 
 // Stable session ID for this browser tab
@@ -11,80 +11,95 @@ const SESSION_ID = `struct_${Date.now()}_${Math.random().toString(36).substr(2, 
 
 const App = () => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "[SYSTEM_INIT] S.T.R.U.C.T Core initialized and standing by for parameter input." }
+    { role: 'assistant', content: 'S.T.R.U.C.T initialized. Standing by for your command.' }
   ]);
   const [input, setInput] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzeStatus, setAnalyzeStatus] = useState('IDLE'); // 'IDLE' | 'RUNNING' | 'COMPLETE' | 'ERROR'
+  const [analyzeStatus, setAnalyzeStatus] = useState('IDLE');
 
-  // Speech mode
-  const [speechMode, setSpeechMode] = useState(false);
-  const [speechStatus, setSpeechStatus] = useState('IDLE'); // 'IDLE' | 'LISTENING' | 'PROCESSING'
+  // Voice pipeline state
+  const [speechStatus, setSpeechStatus] = useState('IDLE'); // IDLE | LISTENING | PROCESSING | SPEAKING
   const [liveTranscript, setLiveTranscript] = useState('');
   const recognitionRef = useRef(null);
   const handleSendRef = useRef(null);
+  const synthRef = useRef(window.speechSynthesis);
 
   useEffect(() => {
     handleSendRef.current = handleSend;
   });
 
-  // ── TTS ────────────────────────────────────────────────────────────────
+  // ── TTS ──────────────────────────────────────────────────────────────────
   const speakResponse = useCallback((text) => {
-    if (!speechMode) return;
-    window.speechSynthesis.cancel();
-    
-    // Strip out console prefixes (e.g. [SYSTEM_INIT]) before speaking
-    const cleanText = text.replace(/\[.*?\]/g, '').trim();
+    synthRef.current.cancel();
+    const cleanText = text.replace(/\[.*?\]/g, '').replace(/\*+/g, '').trim();
     if (!cleanText) return;
 
     const utt = new SpeechSynthesisUtterance(cleanText);
-    utt.rate = 1;
-    utt.pitch = 1;
-    utt.volume = 1;
-    window.speechSynthesis.speak(utt);
-  }, [speechMode]);
+    utt.rate = 1.0;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
 
+    utt.onstart = () => setSpeechStatus('SPEAKING');
+    utt.onend = () => setSpeechStatus('IDLE');
+    utt.onerror = () => setSpeechStatus('IDLE');
+
+    synthRef.current.speak(utt);
+  }, []);
+
+  // ── Speech Recognition ───────────────────────────────────────────────────
   const startListening = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('Speech recognition not supported. Use Chrome.'); return; }
+    if (!SR) {
+      alert('Speech recognition not supported. Please use Chrome or Edge.');
+      return;
+    }
+
+    // Prime TTS engine on first user gesture
+    const primer = new SpeechSynthesisUtterance('');
+    primer.volume = 0;
+    synthRef.current.speak(primer);
+
     const recognition = new SR();
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.onresult = (e) => {
-      let interim = '';
-      let final = '';
-      for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) {
-          final += e.results[i][0].transcript;
-        } else {
-          interim += e.results[i][0].transcript;
-        }
-      }
-      setLiveTranscript(final || interim);
-      if (final) {
-        setSpeechStatus('PROCESSING');
-        // Small delay to let the user see their final text before clearing
-        setTimeout(() => setLiveTranscript(''), 800);
-        if (handleSendRef.current) handleSendRef.current(final);
-      }
-    };
+
     recognition.onstart = () => {
       setSpeechStatus('LISTENING');
       setLiveTranscript('');
     };
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      setLiveTranscript(final || interim);
+      if (final) {
+        setSpeechStatus('PROCESSING');
+        setTimeout(() => setLiveTranscript(''), 600);
+        if (handleSendRef.current) handleSendRef.current(final);
+      }
+    };
+
     recognition.onend = () => {
       setSpeechStatus(prev => prev === 'LISTENING' ? 'IDLE' : prev);
     };
+
     recognition.onerror = (e) => {
-      console.log("Speech error:", e.error);
+      console.error('[STRUCT] Speech error:', e.error);
       if (e.error === 'not-allowed') {
-        setSpeechMode(false);
-        setMessages(prev => [...prev, { role: 'assistant', content: "[SYSTEM_ERROR] Microphone access denied. Reverting to manual input." }]);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Microphone access denied. Please allow microphone access to use voice mode.'
+        }]);
       }
       setSpeechStatus('IDLE');
     };
+
     recognitionRef.current = recognition;
     recognition.start();
   }, []);
@@ -96,75 +111,40 @@ const App = () => {
     setLiveTranscript('');
   }, []);
 
-  const toggleSpeechMode = useCallback(() => {
-    setSpeechMode(prev => {
-      if (prev) { 
-        stopListening(); 
-        window.speechSynthesis.cancel(); 
-      } else {
-        // Prime synthesis engine on toggle (which requires a user click) 
-        // to bypass modern browser interaction policies for audio playback.
-        const initUtt = new SpeechSynthesisUtterance('');
-        initUtt.volume = 0;
-        window.speechSynthesis.speak(initUtt);
-      }
-      return !prev;
-    });
-  }, [stopListening]);
-
   const handleMicInteraction = useCallback(() => {
-    if (!speechMode) {
-      // First, enable speech mode
-      setSpeechMode(true);
-      // Prime TTS
-      const initUtt = new SpeechSynthesisUtterance('');
-      initUtt.volume = 0;
-      window.speechSynthesis.speak(initUtt);
-      // Then start listening (may need a tiny delay for state to propagate if not using functional update or refs)
-      // Actually setSpeechMode triggers a re-render. startListening is stable.
-      // We can call startListening directly.
-      setTimeout(startListening, 100);
+    synthRef.current.cancel();
+    if (speechStatus === 'LISTENING') {
+      stopListening();
+    } else if (speechStatus === 'SPEAKING') {
+      setSpeechStatus('IDLE');
     } else {
-      if (speechStatus === 'LISTENING' || speechStatus === 'PROCESSING') {
-        stopListening();
-      } else {
-        startListening();
-      }
+      startListening();
     }
-  }, [speechMode, speechStatus, startListening, stopListening]);
+  }, [speechStatus, startListening, stopListening]);
 
-  // ── Main send handler ──────────────────────────────────────────────────
+  // ── Main send handler ─────────────────────────────────────────────────────
   const handleSend = async (text = input) => {
     if (!text.trim()) return;
 
-    console.log('[STRUCT] Input received: text');
-    console.log('[STRUCT] User query:', text);
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setInput('');
     setIsAnalyzing(true);
     setAnalyzeStatus('RUNNING');
+    setSpeechStatus('PROCESSING');
 
     try {
-      // ── Single call: chat reply + parameter extraction + normalization ──
-      console.log('[STRUCT] Step 1: Sending to /chat (combined call)');
+      // Step 1: Chat — reply + parameter extraction
       const chatResponse = await axios.post(
         `${API_BASE_URL}/chat?query=${encodeURIComponent(text)}`
       );
-      const jarvisReply    = chatResponse.data.response;
-      const normalizedParams = chatResponse.data.parameters; // normalized + validated
-      const missingFields  = chatResponse.data.missing_fields;
+      const jarvisReply = chatResponse.data.response;
+      const normalizedParams = chatResponse.data.parameters;
 
-      console.log('[STRUCT] Chat reply:', jarvisReply);
-      console.log('[STRUCT] Normalized parameters:', normalizedParams ? 'RECEIVED' : 'none (conversational)');
-      if (missingFields) console.log('[STRUCT] Validation failed:', missingFields);
+      setMessages(prev => [...prev, { role: 'assistant', content: jarvisReply }]);
+      speakResponse(jarvisReply);
 
-      const formattedReply = `[OUTPUT] ${jarvisReply}`;
-      setMessages(prev => [...prev, { role: 'assistant', content: formattedReply }]);
-      speakResponse(formattedReply);
-
-      // ── If normalized parameters came back, run simulation ──────────────
+      // Step 2: If parameters extracted → run simulation
       if (normalizedParams) {
-        // Map normalized format to solver API format
         const beamParams = {
           length:         normalizedParams.length,
           load_magnitude: normalizedParams.load,
@@ -175,155 +155,135 @@ const App = () => {
           beam_height:    normalizedParams.height,
           session_id:     SESSION_ID,
         };
-        console.log('[STRUCT] Step 2: Sending to /beam_analysis:', beamParams);
 
         try {
           const simResponse = await axios.post(`${API_BASE_URL}/beam_analysis`, beamParams);
           const simData = simResponse.data;
-          console.log('[STRUCT] Simulation response keys:', Object.keys(simData));
-          console.log('[STRUCT] max_stress:', simData.max_stress_mpa, 'MPa');
-          console.log('[STRUCT] safety_factor:', simData.safety_factor);
-          console.log('[STRUCT] deflection_mm:', simData.deflection_mm, 'mm');
-          console.log('[STRUCT] plot_image length:', simData.plot_image?.length ?? 'MISSING');
 
           setAnalysisData(simData);
           setAnalyzeStatus('COMPLETE');
 
-          // Console keeps full details; chat shows clean professional message
-          console.log('[STRUCT] Simulation complete —',
-            `ID: ${simData.simulation_id}`,
-            `| Max stress: ${simData.max_stress_mpa?.toFixed(1)} MPa`,
-            `| Safety factor: ${simData.safety_factor?.toFixed(2)}`,
-            `| Max deflection: ${simData.deflection_mm?.toFixed(2)} mm`
-          );
-
-          // S.T.R.U.C.T Copilot Workflow Synthesis Workflow
+          // Step 3: Copilot synthesis
           try {
-            const prompt = `[SYSTEM_INJECT] Simulation finished: Max Stress ${simData.max_stress_mpa?.toFixed(1)} MPa, FoS ${simData.safety_factor?.toFixed(2)}, Deflection ${simData.deflection_mm?.toFixed(2)} mm. 
-Explain this result to the engineer as a proactive copilot. E.g., mention where max stress usually occurs in this type of bean, state clearly if it's safe (FoS > 1), and proactively ask if they want to run a specific follow-up (like buckling or thermal stress). Keep it under 4 concise sentences.`;
-            const syncResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(prompt)}`);
-            const simSynthesis = syncResponse.data.response;
+            const synthPrompt = `[SYSTEM_INJECT] Simulation finished: Max Stress ${simData.max_stress_mpa?.toFixed(1)} MPa, FoS ${simData.safety_factor?.toFixed(2)}, Deflection ${simData.deflection_mm?.toFixed(2)} mm. Explain this result as a proactive structural engineering copilot in 3 concise sentences. Mention if it safe (FoS > 1) and suggest one follow-up analysis.`;
+            const synthResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(synthPrompt)}`);
+            const synthesis = synthResponse.data.response;
             setMessages(prev => [...prev, {
               role: 'assistant',
               type: 'simulation_meta',
-              content: simSynthesis,
+              content: synthesis,
               simulation_id: simData.simulation_id,
             }]);
-            speakResponse(simSynthesis);
-          } catch (e) {
-            // Unlikely fallback
-            const simMsg = `[ANALYSIS_COMPLETE] Simulation solved successfully. Maximum stress is ${simData.max_stress_mpa?.toFixed(1)} Megapascals. Factor of safety is ${simData.safety_factor?.toFixed(2)}.`;
-            setMessages(prev => [...prev, { role: 'assistant', type: 'simulation_meta', content: simMsg, simulation_id: simData.simulation_id }]);
-            speakResponse(simMsg);
+            speakResponse(synthesis);
+          } catch {
+            const fallback = `Analysis complete. Maximum stress is ${simData.max_stress_mpa?.toFixed(1)} MPa with a safety factor of ${simData.safety_factor?.toFixed(2)}.`;
+            setMessages(prev => [...prev, { role: 'assistant', type: 'simulation_meta', content: fallback, simulation_id: simData.simulation_id }]);
+            speakResponse(fallback);
           }
-          setSpeechStatus('IDLE');
+
         } catch (simErr) {
           const detail = simErr.response?.data?.detail || simErr.message;
-          console.error('[STRUCT] /beam_analysis error:', detail);
           setAnalyzeStatus('ERROR');
-          setMessages(prev => [...prev, { role: 'assistant', content: `[EXECUTION_FAILED] ${detail}` }]);
+          setMessages(prev => [...prev, { role: 'assistant', content: `Simulation failed: ${detail}` }]);
         }
       } else {
-        setAnalyzeStatus('IDLE'); // Pure conversation — stay idle
+        setAnalyzeStatus('IDLE');
       }
 
     } catch (chatErr) {
       const detail = chatErr.response?.data?.detail || chatErr.message;
-      console.error('[STRUCT] /chat error:', detail);
       setAnalyzeStatus('ERROR');
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `[CONNECTION_ERROR] Failed to reach ${API_BASE_URL}. ${detail}. Verify that your backend service is running and CORS is allowed.`
+        content: `Connection failed: ${detail}. Verify the backend is running at ${API_BASE_URL}.`
       }]);
     } finally {
       setIsAnalyzing(false);
-      setSpeechStatus('IDLE');
+      setSpeechStatus(prev => prev === 'PROCESSING' ? 'IDLE' : prev);
     }
   };
 
-  // ── File upload handler ────────────────────────────────────────────────
+  // ── Diagram upload handler ────────────────────────────────────────────────
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    console.log('[STRUCT] Input received: image');
+
     setIsAnalyzing(true);
     setAnalyzeStatus('RUNNING');
-    setMessages(prev => [...prev, { role: 'assistant', content: "[PROCESS_STARTED] Computing structural parameters from blueprint diagram." }]);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: 'Diagram received. Extracting structural parameters from image...'
+    }]);
 
     const reader = new FileReader();
-
-    reader.onload = async function() {
-      const base64 = reader.result;
-
+    reader.onload = async () => {
       try {
         const response = await axios.post(`${API_BASE_URL}/diagram_analysis`, {
-          image: base64,
-          prompt: "Extract beam length, load, boundary conditions, and dimensions from this engineering diagram"
+          image: reader.result,
+          prompt: 'Extract beam length, load, boundary conditions, and dimensions from this engineering diagram'
         });
-        
+
         if (response.data.status === 'clarify') {
           setAnalyzeStatus('IDLE');
-          const clarifyMsg = `[VISION_CLARIFY] ${response.data.message}`;
-          setMessages(prev => [...prev, { role: 'assistant', content: clarifyMsg }]);
-          speakResponse(clarifyMsg);
+          const msg = response.data.message;
+          setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
+          speakResponse(msg);
           return;
         }
 
         setAnalysisData(response.data);
         setAnalyzeStatus('COMPLETE');
-        const extractedType = response.data.parameters?.beam_type ?? 'unknown';
-        
+        const extractedType = response.data.parameters?.beam_type ?? 'beam';
+
         try {
-          const prompt = `[SYSTEM_INJECT] Vision analysis complete. Formally acknowledge the extraction of the ${extractedType} beam and inform the user you are solving the system structure.`;
-          const syncResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(prompt)}`);
-          setMessages(prev => [...prev, { role: 'assistant', content: syncResponse.data.response }]);
-          speakResponse(syncResponse.data.response);
-        } catch(e) {
-          const msg = `[VISION_COMPLETE] Extracted structural profile for ${extractedType} beam. Results computed.`;
+          const synthPrompt = `[SYSTEM_INJECT] Vision analysis complete. Formally acknowledge the extraction of a ${extractedType} beam from the uploaded diagram and confirm the simulation results have been computed.`;
+          const synthResponse = await axios.post(`${API_BASE_URL}/chat?query=${encodeURIComponent(synthPrompt)}`);
+          const msg = synthResponse.data.response;
+          setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
+          speakResponse(msg);
+        } catch {
+          const msg = `Diagram analyzed. Extracted ${extractedType} beam profile. Simulation results computed.`;
           setMessages(prev => [...prev, { role: 'assistant', content: msg }]);
           speakResponse(msg);
         }
       } catch (err) {
+        const detail = err.response?.data?.detail || err.message;
         setAnalyzeStatus('ERROR');
-        setMessages(prev => [...prev, { role: 'assistant', content: `[VISION_ERROR] Failed to reach ${API_BASE_URL} for diagram analysis.` }]);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `Diagram analysis failed: ${detail}`
+        }]);
       } finally {
         setIsAnalyzing(false);
       }
     };
-
     reader.readAsDataURL(file);
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-[#050507] text-white p-2 gap-2 overflow-y-auto md:overflow-hidden selection:bg-jarvis-blue/30 selection:text-white">
-      {/* Background decor */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-jarvis-blue/20 to-transparent"></div>
-        <div className="absolute top-0 right-1/4 w-px h-full bg-gradient-to-b from-transparent via-jarvis-blue/20 to-transparent"></div>
-        <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-jarvis-blue/20 to-transparent"></div>
-        <div className="absolute bottom-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-jarvis-blue/20 to-transparent"></div>
+    <div className="app-shell">
+      {/* Ambient grid background */}
+      <div className="bg-grid" aria-hidden="true" />
+
+      <div className="main-layout">
+        <VoiceAssistant
+          messages={messages}
+          input={input}
+          setInput={setInput}
+          handleSend={handleSend}
+          speechStatus={speechStatus}
+          liveTranscript={liveTranscript}
+          handleMicInteraction={handleMicInteraction}
+          handleFileUpload={handleFileUpload}
+          isAnalyzing={isAnalyzing}
+        />
+
+        <AnalysisDashboard
+          analysisData={analysisData}
+          isAnalyzing={isAnalyzing}
+          analyzeStatus={analyzeStatus}
+        />
       </div>
-
-      <ChatInterface
-        messages={messages}
-        input={input}
-        setInput={setInput}
-        handleSend={handleSend}
-        speechMode={speechMode}
-        toggleSpeechMode={toggleSpeechMode}
-        speechStatus={speechStatus}
-        liveTranscript={liveTranscript}
-        startListening={startListening}
-        stopListening={stopListening}
-        handleMicInteraction={handleMicInteraction}
-        handleFileUpload={handleFileUpload}
-      />
-
-      <AnalysisDashboard
-        analysisData={analysisData}
-        isAnalyzing={isAnalyzing}
-        analyzeStatus={analyzeStatus}
-      />
     </div>
   );
 };

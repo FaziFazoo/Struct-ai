@@ -1,102 +1,117 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, MicOff, Upload, MessageSquare } from 'lucide-react';
+import { Upload } from 'lucide-react';
 
-const ChatInterface = ({
-    messages,
-    input,
-    setInput,
-    handleSend,
-    speechMode,
-    toggleSpeechMode,
-    speechStatus,
-    liveTranscript,
-    startListening,
-    stopListening,
-    handleMicInteraction,
-    handleFileUpload
+/* ─────────────────────────────────────────────────────────────────────────────
+   VoiceAssistant — replaces ChatInterface.js
+   Siri / Google Assistant style voice panel:
+   · Central mic button (click = start/stop listening)
+   · Waveform animation when LISTENING
+   · Real-time transcript
+   · Status badge: IDLE | LISTENING | PROCESSING | SPEAKING
+   · Compact text fallback + file upload
+───────────────────────────────────────────────────────────────────────────── */
+
+const STATUS_CONFIG = {
+  IDLE:       { label: 'IDLE',       color: '#00d2ff', pulse: false },
+  LISTENING:  { label: 'LISTENING',  color: '#ff4444', pulse: true  },
+  PROCESSING: { label: 'PROCESSING', color: '#fbbf24', pulse: true  },
+  SPEAKING:   { label: 'SPEAKING',   color: '#34d399', pulse: true  },
+};
+
+// Animated waveform bars
+const Waveform = ({ active }) => (
+  <div className={`waveform ${active ? 'waveform--active' : ''}`} aria-hidden="true">
+    {[1, 2, 3, 4, 5, 6, 7].map(i => (
+      <div
+        key={i}
+        className="waveform__bar"
+        style={{ animationDelay: `${(i - 1) * 0.07}s` }}
+      />
+    ))}
+  </div>
+);
+
+// Mic icon SVG (inline, no extra deps)
+const MicIcon = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="22" />
+    <line x1="8"  y1="22" x2="16" y2="22" />
+  </svg>
+);
+
+const StopIcon = ({ size = 28 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+  </svg>
+);
+
+const VoiceAssistant = ({
+  messages,
+  input,
+  setInput,
+  handleSend,
+  speechStatus,
+  liveTranscript,
+  handleMicInteraction,
+  handleFileUpload,
+  isAnalyzing,
 }) => {
   const scrollRef = useRef(null);
+  const cfg = STATUS_CONFIG[speechStatus] || STATUS_CONFIG.IDLE;
+  const isActive = speechStatus === 'LISTENING';
+  const isBusy   = speechStatus === 'PROCESSING' || speechStatus === 'SPEAKING';
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
-
-  // Removed local handleMicClick, using handleMicInteraction from props
+  }, [messages, liveTranscript]);
 
   return (
-    <div className="w-full md:w-[420px] h-[50vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-white/10 glass-panel md:m-2 overflow-hidden shadow-2xl relative flex-shrink-0">
-      {/* HUD Header — S.T.R.U.C.T Branding */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-2 h-2 bg-jarvis-blue rounded-full shadow-glow animate-pulse"></div>
-            <div className="absolute inset-0 w-2 h-2 bg-jarvis-blue rounded-full animate-ping opacity-75"></div>
-          </div>
+    <div className="voice-panel">
+
+      {/* ── Header */}
+      <div className="voice-panel__header">
+        <div className="header__brand">
+          <div className="brand__dot" />
           <div>
-            <h1 className="text-xs font-black tracking-[0.4em] text-white/90 uppercase">
-              S.T.R.U.C.T
-            </h1>
-            <p className="text-[8px] text-white/30 tracking-[0.15em] uppercase font-light">
-              AI Structural Engineering Copilot
-            </p>
+            <div className="brand__title">S.T.R.U.C.T</div>
+            <div className="brand__sub">AI Structural Engineering Copilot</div>
           </div>
         </div>
-        <div className="flex gap-1">
-          {[1, 2, 3].map(i => <div key={i} className="w-1 h-3 bg-white/10"></div>)}
+        <div className="header__bars" aria-hidden="true">
+          {[1, 2, 3].map(i => <div key={i} className="bar" />)}
         </div>
       </div>
 
-      {/* Mode Toggle Bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-white/[0.01]">
-        <span className="text-[9px] text-white/30 uppercase tracking-widest font-bold">Mode:</span>
-        <button
-          onClick={toggleSpeechMode}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all duration-300 ${
-            speechMode
-              ? 'bg-jarvis-blue/20 border border-jarvis-blue/50 text-jarvis-blue'
-              : 'bg-white/5 border border-white/10 text-white/40 hover:text-white/60'
-          }`}
-        >
-          {speechMode ? <Mic size={10} /> : <MessageSquare size={10} />}
-          {speechMode ? 'Speech' : 'Text'}
-        </button>
-        {speechMode && (
-          <span className={`text-[8px] uppercase tracking-widest ${speechStatus === 'LISTENING' ? 'text-red-400 animate-pulse' : speechStatus === 'PROCESSING' ? 'text-yellow-400 animate-pulse' : 'text-white/20'}`}>
-            {speechStatus === 'LISTENING' ? '● listening' : speechStatus === 'PROCESSING' ? '● processing' : '○ idle'}
-          </span>
-        )}
-      </div>
-
-      {/* Message Stream */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar bg-gradient-to-b from-transparent to-black/20"
-      >
-        <AnimatePresence>
+      {/* ── Message Log */}
+      <div className="voice-panel__messages" ref={scrollRef}>
+        <AnimatePresence initial={false}>
           {messages.map((m, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className={`flex flex-col mb-4 font-mono text-[12px] tracking-wide ${m.role === 'user' ? 'text-white/60' : 'text-jarvis-blue'}`}
+              className={`msg msg--${m.role}`}
             >
               {m.role === 'user' ? (
-                <div className="flex gap-3">
-                  <span className="text-white/30 select-none">{'>'} COMMAND:</span>
-                  <span className="text-white/80 uppercase">{m.content}</span>
+                <div className="msg__user">
+                  <span className="msg__prompt">&gt; YOU</span>
+                  <span className="msg__text">{m.content}</span>
                 </div>
               ) : (
-                <div className="flex gap-3">
-                  <div className="mt-1 w-2 h-2 bg-jarvis-blue rounded-full shadow-glow"></div>
-                  <div className="flex-1 space-y-1">
-                    <span className="text-jarvis-blue/90">{m.content.replace(/^\[.*?\]\s*/, '')}</span>
+                <div className="msg__assistant">
+                  <div className="msg__orb" />
+                  <div className="msg__body">
+                    <span className="msg__text">{m.content}</span>
                     {m.type === 'simulation_meta' && (
-                      <div className="mt-2 pt-2 text-[10px] text-jarvis-blue/40 border-t border-jarvis-blue/10 w-fit uppercase tracking-widest">
-                        [EXEC_ID: {m.simulation_id?.slice(0, 8)}] PORTAL_STATUS: ACTIVE
+                      <div className="msg__exec-tag">
+                        EXEC:{m.simulation_id?.slice(0, 8).toUpperCase()} · PORTAL ACTIVE
                       </div>
                     )}
                   </div>
@@ -105,84 +120,120 @@ const ChatInterface = ({
             </motion.div>
           ))}
         </AnimatePresence>
+
+        {/* Live transcript */}
+        <AnimatePresence>
+          {liveTranscript && (
+            <motion.div
+              key="transcript"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="live-transcript"
+            >
+              {liveTranscript}
+              <span className="transcript__cursor" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Live Transcript Overlay */}
-      <AnimatePresence>
-        {liveTranscript && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="px-6 py-2 pb-0 -mb-2 z-10"
-          >
-            <div className="text-[13px] font-mono italic text-white/50 border-l-2 border-red-500/50 pl-3">
-              {liveTranscript}...
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Central Voice Zone */}
+      <div className="voice-zone">
 
-      {/* Input Module */}
-      <div className="p-5 space-y-4 border-t border-white/5 bg-white/[0.01]">
-        <div className="flex gap-2 items-center bg-white/5 rounded-xl px-4 py-1 border border-white/5 focus-within:border-jarvis-blue/40 transition-all duration-500">
-          <button
-            onClick={handleMicInteraction}
-            className={`transition-all duration-300 relative flex items-center justify-center p-2 rounded-lg ${
-              speechStatus === 'LISTENING'
-                ? 'text-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.4)]'
-                : speechStatus === 'PROCESSING'
-                  ? 'text-yellow-400 animate-pulse'
-                  : 'text-jarvis-blue hover:bg-jarvis-blue/10'
-            }`}
-            title={speechStatus === 'LISTENING' ? 'Stop Listening' : 'Voice Command'}
-          >
-            {speechStatus === 'LISTENING' ? <MicOff size={20} className="animate-pulse" /> : <Mic size={20} />}
-          </button>
-
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && !speechMode && handleSend()}
-            placeholder={speechStatus === 'LISTENING' ? "Listening..." : "Command S.T.R.U.C.T..."}
-            disabled={speechStatus === 'LISTENING'}
-            className="flex-1 bg-transparent py-3 text-[13px] md:text-[13px] font-light tracking-wide text-white focus:outline-none placeholder:text-white/20 disabled:opacity-50 min-w-0"
+        {/* Status badge */}
+        <div className="status-badge" style={{ color: cfg.color }}>
+          <div
+            className={`status-badge__dot ${cfg.pulse ? 'status-badge__dot--pulse' : ''}`}
+            style={{ background: cfg.color }}
           />
-          
-          <div className="flex items-center gap-1">
-            {!speechMode && (
-              <button
-                onClick={() => handleSend()}
-                disabled={!input.trim()}
-                className="group p-2 text-white/20 hover:text-jarvis-blue transition-all disabled:opacity-0"
-              >
-                <Send size={18} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
-          </div>
+          {cfg.label}
         </div>
 
-        <div className="flex justify-between items-center px-2">
-          <div className="flex gap-5 items-center">
-            {/* File upload */}
-            <label className="text-white/30 hover:text-jarvis-blue cursor-pointer transition-all">
-              <Upload size={18} />
-              <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*" />
-            </label>
+        {/* Waveform — shows when LISTENING */}
+        <AnimatePresence>
+          {isActive && (
+            <motion.div
+              initial={{ opacity: 0, scaleY: 0 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0, scaleY: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Waveform active={isActive} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div className="h-4 w-px bg-white/10"></div>
-            <div className="flex items-center gap-2">
-              <div className={`w-1 h-1 rounded-full ${speechMode ? 'bg-jarvis-blue animate-pulse' : 'bg-white/20'}`}></div>
-              <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">
-                {speechMode ? 'Speech_Active' : 'Text_Mode'}
-              </span>
-            </div>
+        {/* Central Mic Button */}
+        <button
+          onClick={handleMicInteraction}
+          className={`mic-btn mic-btn--${speechStatus.toLowerCase()}`}
+          disabled={false}
+          aria-label={isActive ? 'Stop listening' : 'Start listening'}
+          title={isActive ? 'Tap to stop' : isBusy ? speechStatus : 'Tap to speak'}
+        >
+          {/* Outer rings */}
+          {isActive && (
+            <>
+              <div className="mic-ring mic-ring--1" />
+              <div className="mic-ring mic-ring--2" />
+            </>
+          )}
+          {(speechStatus === 'SPEAKING') && (
+            <div className="mic-ring mic-ring--speak" />
+          )}
+
+          {/* Icon */}
+          <div className="mic-btn__icon">
+            {isActive ? <StopIcon size={26} /> : <MicIcon size={28} />}
           </div>
-          <div className="text-[8px] text-white/10 font-black uppercase tracking-[0.5em] select-none">S.T.R.U.C.T_v5</div>
+        </button>
+
+        <p className="voice-hint">
+          {isActive     ? 'Listening... tap to stop'       :
+           isBusy       ? `${speechStatus.toLowerCase()}...` :
+           'Tap to speak'}
+        </p>
+      </div>
+
+      {/* ── Text Input Fallback */}
+      <div className="voice-panel__input">
+        <div className="text-input-row">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder="Or type your command..."
+            disabled={isAnalyzing}
+            className="text-input"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={!input.trim() || isAnalyzing}
+            className="send-btn"
+            aria-label="Send"
+          >
+            ↵
+          </button>
+        </div>
+
+        {/* Bottom meta row */}
+        <div className="input-meta">
+          <label className="upload-btn" title="Upload engineering diagram">
+            <Upload size={16} />
+            <span>Upload Diagram</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </label>
+          <div className="version-tag">S.T.R.U.C.T v6</div>
         </div>
       </div>
     </div>
   );
 };
 
-export default ChatInterface;
+export default VoiceAssistant;
