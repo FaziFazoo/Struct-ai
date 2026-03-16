@@ -22,6 +22,7 @@ const LiveVoiceAssistant = ({
   
   const clientRef = useRef(null);
   const audioContextRef = useRef(null);
+  const streamRef = useRef(null);
   const processorRef = useRef(null);
   const scrollRef = useRef(null);
   const nextStartTimeRef = useRef(0);
@@ -56,14 +57,20 @@ const LiveVoiceAssistant = ({
 
   // Audio Context Resumption on user interaction
   useEffect(() => {
-    const resumeAudio = () => {
+    const resumeAudio = async () => {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         console.log("[S.T.R.U.C.T] Resuming AudioContext via background listener");
-        audioContextRef.current.resume();
+        await audioContextRef.current.resume();
       }
     };
-    window.addEventListener('click', resumeAudio);
-    return () => window.removeEventListener('click', resumeAudio);
+    window.addEventListener('mousedown', resumeAudio);
+    window.addEventListener('touchstart', resumeAudio);
+    window.addEventListener('keydown', resumeAudio);
+    return () => {
+      window.removeEventListener('mousedown', resumeAudio);
+      window.removeEventListener('touchstart', resumeAudio);
+      window.removeEventListener('keydown', resumeAudio);
+    };
   }, []);
 
   const handleLiveMessage = useCallback((data) => {
@@ -215,8 +222,13 @@ const LiveVoiceAssistant = ({
 
   const toggleLive = async () => {
     if (isLive) {
+      console.log("[S.T.R.U.C.T] Toggling LIVE OFF");
       clientRef.current?.disconnect();
       processorRef.current?.disconnect();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       recognitionRef.current?.stop();
       setIsLive(false);
       setSpeechStatus('IDLE');
@@ -253,44 +265,60 @@ const LiveVoiceAssistant = ({
       await client.connect();
       clientRef.current = client;
 
+      // Start/Resume AudioContext
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContextRef.current = new AudioCtx({ sampleRate: 16000 });
+      }
+      const audioContext = audioContextRef.current;
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
       // Start Microphone
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const audioContext = new AudioContext({ sampleRate: 16000 }); // Record at 16k for Gemini
-        if (audioContext.state === 'suspended') {
-          await audioContext.resume();
-        }
+        console.log("[S.T.R.U.C.T] Requesting Microphone...");
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
+        streamRef.current = stream;
+
         nextStartTimeRef.current = audioContext.currentTime;
         const source = audioContext.createMediaStreamSource(stream);
+        
+        // ScriptProcessor is deprecated but widely compatible for PCM streaming
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
         processor.onaudioprocess = (e) => {
+          if (!clientRef.current || clientRef.current.ws?.readyState !== WebSocket.OPEN) return;
+          
           const inputData = e.inputBuffer.getChannelData(0);
           const pcm16 = new Int16Array(inputData.length);
           for (let i = 0; i < inputData.length; i++) {
-            pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+            // Clipped normalization
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
           }
-          let binary = '';
-          const bytes = new Uint8Array(pcm16.buffer);
-          const len = bytes.byteLength;
-          for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          const base64 = btoa(binary);
-          client.sendAudioChunk(base64);
+          
+          // Efficient base64 conversion
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+          clientRef.current.sendAudioChunk(base64);
         };
 
         source.connect(processor);
         processor.connect(audioContext.destination);
-        
-        audioContextRef.current = audioContext;
         processorRef.current = processor;
+        
         setIsLive(true);
         setSpeechStatus('LISTENING');
         setMessages(prev => [...prev, { role: 'assistant', content: "🎙️ S.T.R.U.C.T Live is active. I can hear you now. How can I help with your project?" }]);
+        console.log("[S.T.R.U.C.T] Mic Stream Started Successfully");
       } catch (err) {
-        console.error("Mic error:", err);
-        setMessages(prev => [...prev, { role: 'assistant', content: `Microphone Error: ${err.message}. Please check browser permissions.` }]);
+        console.error("[S.T.R.U.C.T] Mic error:", err);
+        setMessages(prev => [...prev, { role: 'assistant', content: `Microphone Error: ${err.message}. Please click the lock icon in the URL bar and allow microphone access.` }]);
       }
     }
   };
@@ -361,6 +389,7 @@ const LiveVoiceAssistant = ({
             console.log(`[S.T.R.U.C.T] Attempting fallback with ${mName}...`);
             const genModel = genAI.getGenerativeModel({ 
               model: mName,
+              systemInstruction: "You are a structural engineering AI. When a user describes any beam (e.g., 'analyze a 5m beam with 10kN load'), you MUST immediately call the analyze_beam function with default values for missing params. NEVER ask follow-up questions. ALWAYS call the tool. Default values: width=0.1, height=0.2, material='Carbon Steel', load_position=half of length, type='simply_supported'.",
               tools: [{
                 functionDeclarations: [{
                   name: "analyze_beam",

@@ -23,12 +23,13 @@ const App = () => {
   const [analyzeStatus, setAnalyzeStatus] = useState('IDLE');
 
   // Voice pipeline state
-  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [activeModel, setActiveModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.5-flash');
+  const DEMO_KEY = 'AIzaSyApTjsEOrRz67GHMWvKgsYEAK9uPSAw-Vo';
+  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || DEMO_KEY);
+  const [activeModel, setActiveModel] = useState(localStorage.getItem('gemini_model') || 'gemini-2.0-flash');
   const [universalApiKey, setUniversalApiKey] = useState(localStorage.getItem('universal_api_key') || '');
   const [universalModel, setUniversalModel] = useState(localStorage.getItem('universal_model') || 'gpt-4o');
   const [universalBaseUrl, setUniversalBaseUrl] = useState(localStorage.getItem('universal_base_url') || 'https://api.openai.com/v1');
-  const [showSettings, setShowSettings] = useState(!localStorage.getItem('gemini_api_key'));
+  const [showSettings, setShowSettings] = useState(false);
 
   // ── Analysis Bridge ──────────────────────────────────────────────────────
   const runAnalysis = useCallback(async (params) => {
