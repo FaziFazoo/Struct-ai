@@ -20,20 +20,19 @@ except ImportError:
 VISION_PROMPT = (
     "You are S.T.R.U.C.T, an expert structural engineering AI copilot. "
     "Analyze this engineering diagram (free body diagram, beam sketch, or structural drawing) "
-    "and extract all visible beam parameters. "
+    "with aerospace-grade precision. "
+    "Extract all visible beam parameters, paying close attention to labels, units, and support symbols. "
     "Return ONLY a raw JSON object (no markdown, no backticks, no extra text). "
     "\n\n"
-    "If the diagram clearly shows beam type, loads, supports, and dimensions, return:\n"
-    '{"status": "success", "message": "Parameters extracted from diagram.", '
+    "Required JSON structure:\n"
+    '{"status": "success", "message": "Parameters extracted.", '
     '"parameters": {"beam_type": "cantilever" or "simply_supported", '
     '"length": <float in metres>, "load": <float in Newtons>, '
+    '"load_position": <float in metres from left support>, '
     '"width": <float in metres>, "height": <float in metres>, '
     '"material": "<string>"}}\n\n'
-    "If critical information (length or load magnitude) is missing or illegible, return:\n"
-    '{"status": "clarify", '
-    '"message": "I can see the beam supports and load indicators, but I could not determine '
-    'the exact beam length or load magnitude. Could you clarify those values?", '
-    '"parameters": null}'
+    "If any critical value (length or load) is ambiguous, use your engineering judgment "
+    "to provide a best-estimate value and set 'status': 'clarify' with a message explaining the assumption."
 )
 
 # MIME type detection from base64 data-URL header
@@ -106,7 +105,7 @@ class VisionModule:
             image_part = Part.from_data(data=img_bytes, mime_type=mime_type)
             log.info("[VisionModule] Image decoded and packaged into Vertex Part")
 
-            response = self.model.generate_content([image_part, effective_prompt])
+            response = await self.model.generate_content_async([image_part, effective_prompt])
             text = response.text.strip()
             log.info(f"[VisionModule] Gemini raw response: {text[:300]}")
 

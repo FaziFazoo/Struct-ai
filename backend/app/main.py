@@ -9,7 +9,9 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import os
 import uuid
+import httpx
 from datetime import datetime
+from fastapi.staticfiles import StaticFiles
 
 from app.solvers.beam_solver import BeamSolver
 from app.solvers.thermal_solver import ThermalSolver
@@ -38,6 +40,10 @@ app.add_middleware(
 
 # Initialize engines
 viz_engine = VisualizationEngine(output_dir="static/plots")
+
+# Ensure static directories exist
+os.makedirs("static/plots", exist_ok=True)
+os.makedirs("static/frontend", exist_ok=True)
 
 # ── Vertex AI Configuration ───────────────────────────────────────────────────
 project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "")
@@ -174,7 +180,8 @@ def _run_analysis(length: float, load_magnitude: float, load_position: float,
         rec = {k: v for k, v in response.items() if k != "plot_image"}
         simulation_sessions[session_id].append(rec)
 
-    log.info(f"Simulation COMPLETE — id={str(sim_id)[:8]}")
+    sid_str = str(sim_id)
+    log.info(f"Simulation COMPLETE — id={sid_str[:8]}")
     return response
 
 
@@ -328,6 +335,79 @@ async def run_dynamic_solver(analysis_type: str, parameters: dict):
     return result
 
 
+@app.post("/universal_proxy")
+async def universal_proxy(payload: dict):
+    """
+    Proxy for Universal LLM calls to bypass CORS issues in-browser.
+    Used as the 'Demo Safety Net' for structural analysis detection.
+    """
+    config = payload.get("config", {})
+    query = payload.get("query", "")
+    
+    api_key = config.get("key")
+    model = config.get("model", "gpt-4o")
+    base_url = config.get("baseUrl", "https://api.openai.com/v1")
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API Key is required for fallback")
+        
+    async with httpx.AsyncClient() as client:
+        try:
+            log.info(f"Universal Proxy: Calling {model} at {base_url}")
+            response = await client.post(
+                f"{base_url.rstrip('/')}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": query}],
+                    "tools": [{
+                        "type": "function",
+                        "function": {
+                            "name": "analyze_beam",
+                            "description": "Run a structural analysis on a beam.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "length": {"type": "number"},
+                                    "load": {"type": "number"},
+                                    "load_position": {"type": "number"},
+                                    "type": {"type": "string", "enum": ["cantilever", "simply_supported"]},
+                                    "material": {"type": "string"},
+                                    "width": {"type": "number"},
+                                    "height": {"type": "number"}
+                                },
+                                "required": ["length", "load", "type"]
+                            }
+                        }
+                    }]
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://struct-pro-962155187689.us-central1.run.app", # Required for OpenRouter
+                    "X-Title": "S.T.R.U.C.T LIVE" # Optional but good for OpenRouter logs
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            log.error(f"Universal Proxy HTTP Error: {e.response.status_code}")
+            try:
+                error_detail = e.response.json()
+            except:
+                error_detail = e.response.text
+            raise HTTPException(status_code=e.response.status_code, detail=f"Universal Proxy Error: {error_detail}")
+        except Exception as e:
+            log.error(f"Universal Proxy Critical Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Mounting Frontend (Must be last) ───────────────────────────────────────────
+if os.path.exists("static/frontend"):
+    app.mount("/", StaticFiles(directory="static/frontend", html=True), name="frontend")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    # In production, Cloud Run provides PORT env var
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)

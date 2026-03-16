@@ -29,9 +29,14 @@ desktop.ini
 # Docker volumes
 backend/static/plots/*.png
 
-# Logs
+# Logs & Debug
 *.log
 npm-debug.log*
+*.json
+!submission_details.md
+backend_logs.txt
+vertex_test_err.txt
+frontend/build_log.txt
 
 # Python virtualenv
 venv/

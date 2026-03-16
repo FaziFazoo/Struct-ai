@@ -6,4 +6,5 @@ scipy
 pillow
 pydantic
 python-multipart
-google-cloud-aiplatform>=1.38.0
+google-cloud-aiplatform>=1.52.0
+httpx

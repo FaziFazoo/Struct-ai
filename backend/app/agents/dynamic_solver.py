@@ -57,7 +57,7 @@ class DynamicSolverAgent:
             f"Expected parameters: {json.dumps(parameters)}\n"
             f"Return only the Python function code."
         )
-        response = self.model.generate_content(prompt)
+        response = await self.model.generate_content_async(prompt)
         code = response.text.strip()
         if "```python" in code:
             code = code.split("```python")[1].split("```")[0].strip()

@@ -515,10 +515,193 @@ html, body, #root {
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .main-layout { flex-direction: column; overflow-y: auto; height: auto; }
-  .voice-panel { width: 100%; height: auto; min-height: 520px; flex-shrink: 0; }
-  .stat-grid { grid-template-columns: repeat(2,1fr); }
-  .detail-row { height: auto; flex-direction: column; }
-  html, body, #root { overflow: auto; height: auto; }
-  .app-shell { height: auto; min-height: 100vh; overflow: auto; }
+  html, body, #root { 
+    overflow-y: auto !important; 
+    height: auto !important; 
+  }
+  
+  .app-shell { 
+    height: auto; 
+    min-height: 100vh; 
+    overflow-y: auto; 
+  }
+
+  .main-layout { 
+    flex-direction: column; 
+    height: auto; 
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .voice-panel { 
+    width: 100%; 
+    height: 500px; /* Fixed height for chat on mobile */
+    flex-shrink: 0;
+    order: 2; /* Put chat below dashboard on mobile if preferred, or keep as is */
+  }
+
+  .dashboard {
+    order: 1;
+    height: auto;
+    overflow: visible;
+  }
+
+  .stat-grid { 
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-card__value {
+    font-size: 18px;
+  }
+
+  .plot-panel {
+    height: 380px; /* Fixed height for plot on mobile */
+    min-height: 380px;
+  }
+
+  .detail-row { 
+    height: auto; 
+    flex-direction: column; 
+    gap: 12px;
+  }
+
+  .warnings-panel, .material-panel {
+    min-height: 140px;
+  }
+
+  .layer-tabs {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .layer-tab {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+    font-size: 9px;
+    padding: 8px 4px;
+  }
+
+  /* Modal optimizations for touch */
+  .modal-img {
+    max-width: 98vw;
+    border-radius: 8px;
+  }
+  
+  .modal-close {
+    top: 10px;
+    right: 10px;
+  }
 }
+
+.layer-tabs-container {
+  width: 100%;
+  overflow-x: auto;
+  padding: 4px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.layer-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  min-width: max-content;
+}
+
+.layer-tab {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-lo);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.layer-tab:hover {
+  color: var(--text-hi);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.layer-tab.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(0, 210, 255, 0.3);
+}
+
+.settings-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 90;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-lo);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+
+.settings-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ── Live Agent Extras ──────────────────────────────────────────────────── */
+.waveform-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.live-orb {
+  width: 12px;
+  height: 12px;
+  background: #34d399;
+  border-radius: 50%;
+  box-shadow: 0 0 20px #34d399;
+  animation: orb-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes orb-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 20px #34d399; }
+  50% { transform: scale(1.4); opacity: 0.7; box-shadow: 0 0 30px #34d399; }
+}
+
+.brand__dot.active {
+  background: #34d399 !important;
+  box-shadow: 0 0 12px #34d399 !important;
+}
+
+.voice-hint {
+  font-size: 10px;
+  color: var(--text-lo);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+

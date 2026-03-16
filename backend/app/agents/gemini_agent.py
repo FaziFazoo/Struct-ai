@@ -92,7 +92,7 @@ class GeminiAgent:
         """
         if self.chat:
             try:
-                response = self.chat.send_message(query)
+                response = await self.chat.send_message_async(query)
                 text = response.text.strip()
 
                 # Strip accidental markdown fences

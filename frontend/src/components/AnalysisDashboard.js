@@ -13,6 +13,7 @@ const statusColors = {
 
 const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [activeLayer, setActiveLayer] = useState('stress');
 
   // Resolve values — prefer flat top-level fields for forward compat
   const maxStressMpa = analysisData?.max_stress_mpa
@@ -44,9 +45,85 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
       ? 'plot-panel__dot plot-panel__dot--done'
       : 'plot-panel__dot plot-panel__dot--idle';
 
+  // Handle Layer Display
+  const renderPlot = () => {
+    if (isAnalyzing) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+          <div style={{ position: 'relative', width: 60, height: 60 }}>
+            <div style={{ position: 'absolute', inset: 0, border: '2px solid rgba(0,210,255,0.15)', borderRadius: '50%' }} />
+            <div style={{ position: 'absolute', inset: 0, border: '2px solid transparent', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} />
+          </div>
+          <span style={{ fontSize: 11, letterSpacing: '0.25em', color: 'var(--accent)', textTransform: 'uppercase', animation: 'pulse 1s ease infinite' }}>
+            Running Simulation...
+          </span>
+        </div>
+      );
+    }
+
+    const plotData = analysisData?.plot_image;
+    if (!plotData) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, color: 'var(--text-lo)' }}>
+          <Activity size={56} style={{ opacity: 0.12 }} />
+          <span style={{ fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.5 }}>
+            System Idle — Awaiting Parameters
+          </span>
+        </div>
+      );
+    }
+
+    if (analyzeStatus === 'ERROR') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'rgba(255,68,68,0.5)' }}>
+          <Activity size={48} style={{ opacity: 0.3 }} />
+          <span style={{ fontSize: 11, letterSpacing: '0.25em', textTransform: 'uppercase' }}>
+            Simulation Error — Check Console
+          </span>
+        </div>
+      );
+    }
+
+    // Determine current image (handle both legacy string and new object/dict)
+    let currentImg = "";
+    if (typeof plotData === 'string') {
+      currentImg = plotData;
+    } else {
+      currentImg = plotData[activeLayer] || Object.values(plotData)[0];
+    }
+
+    return (
+      <>
+        <img
+          src={`data:image/png;base64,${currentImg}`}
+          alt="S.T.R.U.C.T Analysis Plot"
+          className="plot-img"
+          onClick={() => setModalOpen(true)}
+          title="Click to expand"
+          style={{ filter: 'drop-shadow(0 0 16px rgba(0,210,255,0.12))' }}
+        />
+        
+        {typeof plotData === 'object' && Object.keys(plotData).length > 1 && (
+          <div className="layer-tabs-container">
+            <div className="layer-tabs">
+              {['stress', 'deflection', 'shear', 'moment'].map(k => (
+                <button 
+                  key={k} 
+                  className={`layer-tab ${activeLayer === k ? 'active' : ''}`}
+                  onClick={() => setActiveLayer(k)}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="dashboard">
-
       {/* ── Stat grid */}
       <div className="stat-grid">
         {stats.map((s, i) => (
@@ -84,40 +161,7 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
 
         <div className="plot-canvas">
           <div className="plot-canvas__grid" />
-          {isAnalyzing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-              <div style={{ position: 'relative', width: 60, height: 60 }}>
-                <div style={{ position: 'absolute', inset: 0, border: '2px solid rgba(0,210,255,0.15)', borderRadius: '50%' }} />
-                <div style={{ position: 'absolute', inset: 0, border: '2px solid transparent', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.9s linear infinite' }} />
-              </div>
-              <span style={{ fontSize: 11, letterSpacing: '0.25em', color: 'var(--accent)', textTransform: 'uppercase', animation: 'pulse 1s ease infinite' }}>
-                Running Simulation...
-              </span>
-            </div>
-          ) : analysisData?.plot_image ? (
-            <img
-              src={`data:image/png;base64,${analysisData.plot_image}`}
-              alt="S.T.R.U.C.T Analysis Plot"
-              className="plot-img"
-              onClick={() => setModalOpen(true)}
-              title="Click to expand"
-              style={{ filter: 'drop-shadow(0 0 16px rgba(0,210,255,0.12))' }}
-            />
-          ) : analyzeStatus === 'ERROR' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'rgba(255,68,68,0.5)' }}>
-              <Activity size={48} style={{ opacity: 0.3 }} />
-              <span style={{ fontSize: 11, letterSpacing: '0.25em', textTransform: 'uppercase' }}>
-                Simulation Error — Check Console
-              </span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, color: 'var(--text-lo)' }}>
-              <Activity size={56} style={{ opacity: 0.12 }} />
-              <span style={{ fontSize: 10, letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.5 }}>
-                System Idle — Awaiting Parameters
-              </span>
-            </div>
-          )}
+          {renderPlot()}
         </div>
       </div>
 
@@ -184,13 +228,17 @@ const AnalysisDashboard = ({ analysisData, isAnalyzing, analyzeStatus }) => {
       </div>
 
       {/* ── Full-screen modal */}
-      {modalOpen && analysisData?.plot_image && (
+      {modalOpen && (analysisData?.plot_image) && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <button className="modal-close" onClick={() => setModalOpen(false)} aria-label="Close">
             <X size={28} />
           </button>
           <img
-            src={`data:image/png;base64,${analysisData.plot_image}`}
+            src={`data:image/png;base64,${
+              typeof analysisData.plot_image === 'string' 
+                ? analysisData.plot_image 
+                : (analysisData.plot_image[activeLayer] || Object.values(analysisData.plot_image)[0])
+            }`}
             alt="Full-size FEM Analysis"
             className="modal-img"
             onClick={e => e.stopPropagation()}
